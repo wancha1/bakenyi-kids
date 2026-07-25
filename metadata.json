@@ -1,0 +1,6 @@
+{
+  "name": "Bakenye Kids",
+  "description": "Play. Learn. Preserve. An interactive Bakenye language and culture learning adventure for children.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
