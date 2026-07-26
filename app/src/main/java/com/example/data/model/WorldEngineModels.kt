@@ -18,18 +18,19 @@ data class VocabularyEntity(
 @Entity(tableName = "child_discoveries")
 data class ChildDiscoveryEntity(
     @PrimaryKey val id: String,
-    val childId: Int = 1,
+    val childProfileId: String = "1",
     val locationKey: String,
-    val speciesKey: String,
-    val discoveredAt: Long = System.currentTimeMillis()
+    val itemKey: String,
+    val discoveredAtTimestamp: Long = System.currentTimeMillis()
 )
 
 @Entity(tableName = "location_progress")
 data class LocationProgressEntity(
     @PrimaryKey val locationId: String,
-    val childId: Int = 1,
-    val wordsMastered: Int = 0,
-    val stars: Int = 0
+    val childProfileId: String = "1",
+    val termsMastered: Int = 0,
+    val starsEarned: Int = 0,
+    val isCompleted: Boolean = false
 )
 
 // Sealed State Machine for Child Location Journey

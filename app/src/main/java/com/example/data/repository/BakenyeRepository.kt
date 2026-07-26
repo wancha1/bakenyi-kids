@@ -26,16 +26,16 @@ class BakenyeRepository(private val dao: BakenyeDao) {
     suspend fun recordDiscovery(locationKey: String, speciesKey: String) {
         val discovery = ChildDiscoveryEntity(
             id = "${locationKey}_${speciesKey}",
-            childId = 1,
+            childProfileId = "1",
             locationKey = locationKey,
-            speciesKey = speciesKey,
-            discoveredAt = System.currentTimeMillis()
+            itemKey = speciesKey,
+            discoveredAtTimestamp = System.currentTimeMillis()
         )
         dao.recordDiscovery(discovery)
     }
 
     suspend fun updateLocationProgress(locationId: String, wordsMastered: Int, stars: Int) {
-        dao.saveLocationProgress(LocationProgressEntity(locationId, childId = 1, wordsMastered = wordsMastered, stars = stars))
+        dao.saveLocationProgress(LocationProgressEntity(locationId, childProfileId = "1", termsMastered = wordsMastered, starsEarned = stars, isCompleted = false))
     }
 
     suspend fun completeLesson(lessonId: String, starReward: Int, coinReward: Int) {
@@ -85,7 +85,7 @@ class BakenyeRepository(private val dao: BakenyeDao) {
         dao.saveVocabularyItems(fishingVocabulary)
 
         // Initial Location Progress
-        dao.saveLocationProgress(LocationProgressEntity("FISHING_AREA", childId = 1, wordsMastered = 1, stars = 3))
+        dao.saveLocationProgress(LocationProgressEntity("FISHING_AREA", childProfileId = "1", termsMastered = 1, starsEarned = 3, isCompleted = false))
 
         // Seeding Lessons for World 1 & 2
         val initialLessons = listOf(
