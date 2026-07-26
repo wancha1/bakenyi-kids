@@ -30,7 +30,13 @@ data class BakenyeUiState(
     val activePhraseIndex: Int = 0,
     val isPlayingAudio: Boolean = false,
     val showRewardModal: Boolean = false,
-    val earnedRewardStars: Int = 0
+    val earnedRewardStars: Int = 0,
+    val showOpeningIntro: Boolean = true,
+    val currentIntroStep: Int = 0,
+    val guideMessage: String = "Oli otya! I am Kato the Otter! Ready to explore Lake Kyoga's hidden story islands?",
+    val selectedQuestMode: String = "ISLAND_EXPLORER",
+    val targetAgeGroup: String = "5-7",
+    val selectedLocationNode: String = "ALL"
 )
 
 enum class NavigationTab {
@@ -48,6 +54,12 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
     private val _isPlayingAudio = MutableStateFlow(false)
     private val _showRewardModal = MutableStateFlow(false)
     private val _earnedRewardStars = MutableStateFlow(0)
+    private val _showOpeningIntro = MutableStateFlow(true)
+    private val _currentIntroStep = MutableStateFlow(0)
+    private val _guideMessage = MutableStateFlow("Oli otya! I am Kato the Otter! Ready to explore Lake Kyoga's hidden story islands?")
+    private val _selectedQuestMode = MutableStateFlow("ISLAND_EXPLORER")
+    private val _targetAgeGroup = MutableStateFlow("5-7")
+    private val _selectedLocationNode = MutableStateFlow("ALL")
 
     val uiState: StateFlow<BakenyeUiState>
 
@@ -84,7 +96,23 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
             Triple(playing, showReward, earnedStars)
         }
 
-        uiState = combine(dbState, sessionState, rewardState) { db, session, reward ->
+        val introState = combine(
+            _showOpeningIntro,
+            _currentIntroStep,
+            _guideMessage,
+            _selectedQuestMode
+        ) { showIntro, step, guideMsg, questMode ->
+            Quad(showIntro, step, guideMsg, questMode)
+        }
+
+        val adaptiveState = combine(
+            _targetAgeGroup,
+            _selectedLocationNode
+        ) { ageGroup, locNode ->
+            Pair(ageGroup, locNode)
+        }
+
+        uiState = combine(dbState, sessionState, rewardState, introState, adaptiveState) { db, session, reward, intro, adaptive ->
             BakenyeUiState(
                 profile = db.first,
                 worlds = db.second,
@@ -95,13 +123,66 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
                 activePhraseIndex = session.fourth,
                 isPlayingAudio = reward.first,
                 showRewardModal = reward.second,
-                earnedRewardStars = reward.third
+                earnedRewardStars = reward.third,
+                showOpeningIntro = intro.first,
+                currentIntroStep = intro.second,
+                guideMessage = intro.third,
+                selectedQuestMode = intro.fourth,
+                targetAgeGroup = adaptive.first,
+                selectedLocationNode = adaptive.second
             )
         }.stateIn(
             scope = viewModelScope,
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = BakenyeUiState()
         )
+    }
+
+    fun nextIntroStep() {
+        if (_currentIntroStep.value < 4) {
+            _currentIntroStep.value += 1
+        } else {
+            _showOpeningIntro.value = false
+        }
+    }
+
+    fun skipIntroToWorld() {
+        _showOpeningIntro.value = false
+    }
+
+    fun replayOpeningIntro() {
+        _currentIntroStep.value = 0
+        _showOpeningIntro.value = true
+    }
+
+    fun selectQuestMode(mode: String) {
+        _selectedQuestMode.value = mode
+        when (mode) {
+            "ISLAND_EXPLORER" -> _guideMessage.value = "Awesome! We'll explore Lake Kyoga's islands node by node!"
+            "STORY_FINDER" -> _guideMessage.value = "Great choice! Elder stories await under the Great Baobab!"
+            "HERO_QUEST" -> _guideMessage.value = "Hero status! Collect stars and unlock traditional Bakenye badges!"
+        }
+    }
+
+    fun selectAgeGroup(group: String) {
+        _targetAgeGroup.value = group
+        when (group) {
+            "5-7" -> _guideMessage.value = "Ages 5-7 Mode: High visuals, audio-first stories with Kato! 🦦"
+            "8-10" -> _guideMessage.value = "Ages 8-10 Mode: Interactive word games & cultural challenges!"
+            "11-13" -> _guideMessage.value = "Ages 11-13 Mode: Elder proverbs, folklore history & word archives!"
+        }
+    }
+
+    fun selectLocationNode(node: String) {
+        _selectedLocationNode.value = node
+        when (node) {
+            "BOAT_VILLAGE" -> _guideMessage.value = "🛶 Welcome to Boat Village! Learn canoe craft & fisher tales."
+            "FISHING_AREA" -> _guideMessage.value = "🐟 Fishing Area! Discover Lake Kyoga water life & species names."
+            "PAPYRUS_GARDEN" -> _guideMessage.value = "🌿 Papyrus Garden! Learn sacred flora & lakeside nature words."
+            "VILLAGE_HOME" -> _guideMessage.value = "🏠 Village Home! Family greetings & daily Bakenye life."
+            "ELDER_BAOBAB" -> _guideMessage.value = "📖 Elder Baobab! Ancient folktales & wisdom under the tree."
+            else -> _guideMessage.value = "Oli otya! Explore all locations across Lake Kyoga Shores!"
+        }
     }
 
     fun selectTab(tab: NavigationTab) {

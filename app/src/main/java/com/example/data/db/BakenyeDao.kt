@@ -5,9 +5,12 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.example.data.model.Badge
+import com.example.data.model.ChildDiscoveryEntity
 import com.example.data.model.Lesson
+import com.example.data.model.LocationProgressEntity
 import com.example.data.model.Phrase
 import com.example.data.model.UserProfile
+import com.example.data.model.VocabularyEntity
 import com.example.data.model.World
 import kotlinx.coroutines.flow.Flow
 
@@ -48,4 +51,23 @@ interface BakenyeDao {
 
     @Query("UPDATE user_profile SET stars = stars + :addStars, coins = coins + :addCoins WHERE id = 1")
     suspend fun rewardUser(addStars: Int, addCoins: Int)
+
+    // World Engine Vocabulary & Progress
+    @Query("SELECT * FROM vocabulary_items WHERE locationId = :locationId")
+    fun getVocabularyForLocation(locationId: String): Flow<List<VocabularyEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveVocabularyItems(items: List<VocabularyEntity>)
+
+    @Query("SELECT * FROM child_discoveries WHERE locationKey = :locationKey")
+    fun getChildDiscoveries(locationKey: String): Flow<List<ChildDiscoveryEntity>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun recordDiscovery(discovery: ChildDiscoveryEntity)
+
+    @Query("SELECT * FROM location_progress WHERE locationId = :locationId")
+    fun getLocationProgress(locationId: String): Flow<LocationProgressEntity?>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveLocationProgress(progress: LocationProgressEntity)
 }

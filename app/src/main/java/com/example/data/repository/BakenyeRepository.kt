@@ -2,9 +2,12 @@ package com.example.data.repository
 
 import com.example.data.db.BakenyeDao
 import com.example.data.model.Badge
+import com.example.data.model.ChildDiscoveryEntity
 import com.example.data.model.Lesson
+import com.example.data.model.LocationProgressEntity
 import com.example.data.model.Phrase
 import com.example.data.model.UserProfile
+import com.example.data.model.VocabularyEntity
 import com.example.data.model.World
 import kotlinx.coroutines.flow.Flow
 
@@ -16,6 +19,24 @@ class BakenyeRepository(private val dao: BakenyeDao) {
 
     fun getLessonsForWorld(worldId: Int): Flow<List<Lesson>> = dao.getLessonsForWorld(worldId)
     fun getPhrasesForWorld(worldId: Int): Flow<List<Phrase>> = dao.getPhrasesForWorld(worldId)
+    fun getVocabularyForLocation(locationId: String): Flow<List<VocabularyEntity>> = dao.getVocabularyForLocation(locationId)
+    fun getChildDiscoveries(locationKey: String): Flow<List<ChildDiscoveryEntity>> = dao.getChildDiscoveries(locationKey)
+    fun getLocationProgress(locationId: String): Flow<LocationProgressEntity?> = dao.getLocationProgress(locationId)
+
+    suspend fun recordDiscovery(locationKey: String, speciesKey: String) {
+        val discovery = ChildDiscoveryEntity(
+            id = "${locationKey}_${speciesKey}",
+            childId = 1,
+            locationKey = locationKey,
+            speciesKey = speciesKey,
+            discoveredAt = System.currentTimeMillis()
+        )
+        dao.recordDiscovery(discovery)
+    }
+
+    suspend fun updateLocationProgress(locationId: String, wordsMastered: Int, stars: Int) {
+        dao.saveLocationProgress(LocationProgressEntity(locationId, childId = 1, wordsMastered = wordsMastered, stars = stars))
+    }
 
     suspend fun completeLesson(lessonId: String, starReward: Int, coinReward: Int) {
         dao.markLessonCompleted(lessonId)
@@ -52,6 +73,19 @@ class BakenyeRepository(private val dao: BakenyeDao) {
             World(11, "World 11", "Wisdom & Proverbs", "👑", isUnlocked = false, totalLessons = 3)
         )
         dao.saveWorlds(initialWorlds)
+
+        // Seeding Fishing Area Vocabulary Items
+        val fishingVocabulary = listOf(
+            VocabularyEntity("V_ENSOMBA", "FISHING_AREA", "Ensomba", "Fish (General)", "En-sohm-bah", "audio_ensomba", "Fish are the heart of life along Lake Kyoga Shores."),
+            VocabularyEntity("V_MUKENE", "FISHING_AREA", "Mukene", "Silver Cyprinid Fish", "Moo-keh-neh", "audio_mukene", "Tiny silver fish harvested under moonlight with lanterns."),
+            VocabularyEntity("V_NGEGE", "FISHING_AREA", "Ngege", "Tilapia Fish", "Ngeh-gheh", "audio_ngege", "Prized freshwater fish cooked in rich sesame paste."),
+            VocabularyEntity("V_ERYATO", "FISHING_AREA", "Eryato", "Traditional Wooden Canoe", "Eh-ryah-toh", "audio_eryato", "Handcrafted canoe hollowed from sacred MVule trees."),
+            VocabularyEntity("V_EKITIMBA", "FISHING_AREA", "Ekitimba", "Woven Fishing Net", "Eh-kee-teem-bah", "audio_ekitimba", "Hand-knotted reed mesh passed down through fisherman elders.")
+        )
+        dao.saveVocabularyItems(fishingVocabulary)
+
+        // Initial Location Progress
+        dao.saveLocationProgress(LocationProgressEntity("FISHING_AREA", childId = 1, wordsMastered = 1, stars = 3))
 
         // Seeding Lessons for World 1 & 2
         val initialLessons = listOf(
