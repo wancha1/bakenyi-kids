@@ -5,14 +5,16 @@ import androidx.room.PrimaryKey
 
 @Entity(tableName = "user_profile")
 data class UserProfile(
-    @PrimaryKey val id: Int = 1,
+    @PrimaryKey val id: String = java.util.UUID.randomUUID().toString(),
     val name: String = "Kato's Journey",
     val level: Int = 4,
     val stars: Int = 125,
     val coins: Int = 450,
     val streakDays: Int = 3,
     val guideAvatar: String = "🦒",
-    val currentWorld: Int = 1
+    val currentWorld: Int = 1,
+    val createdAtTimestamp: Long = System.currentTimeMillis(),
+    val updatedAtTimestamp: Long = System.currentTimeMillis()
 )
 
 @Entity(tableName = "worlds")

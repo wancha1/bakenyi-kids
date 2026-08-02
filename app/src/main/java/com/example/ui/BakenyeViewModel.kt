@@ -208,9 +208,14 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
         } else {
             // Lesson completed!
             val currentLesson = _activeLesson.value
+            val profileId = uiState.value.profile.id
             if (currentLesson != null) {
                 viewModelScope.launch {
-                    repository.completeLesson(currentLesson.lessonId, starReward = 3, coinReward = 20)
+                    if (profileId.isNotEmpty()) {
+                        repository.completeLesson(childProfileId = profileId, lessonId = currentLesson.lessonId, starReward = 3, coinReward = 20)
+                    } else {
+                        repository.completeLesson(lessonId = currentLesson.lessonId, starReward = 3, coinReward = 20)
+                    }
                     _earnedRewardStars.value = 3
                     _showRewardModal.value = true
                     _activeLesson.value = null

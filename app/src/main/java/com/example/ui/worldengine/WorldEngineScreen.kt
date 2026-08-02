@@ -9,6 +9,8 @@ import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -372,7 +374,9 @@ fun VocabularyLearningModal(
             colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Row(
@@ -478,7 +482,9 @@ fun PracticeInteractionModal(
             colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(text = "PRACTICE STEP", fontSize = 11.sp, fontWeight = FontWeight.Black, color = OliveGreenPrimary)
@@ -538,7 +544,9 @@ fun ChallengeGameModal(
             colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(text = "FISHING AREA CHALLENGE", fontSize = 11.sp, fontWeight = FontWeight.Black, color = OliveGreenPrimary)
@@ -604,7 +612,9 @@ fun RewardBadgeModal(
             colors = CardDefaults.cardColors(containerColor = SurfaceWhite)
         ) {
             Column(
-                modifier = Modifier.padding(24.dp),
+                modifier = Modifier
+                    .padding(24.dp)
+                    .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
                 Text(text = "HERITAGE BADGE UNLOCKED! 🎉", fontSize = 13.sp, fontWeight = FontWeight.Black, color = OliveGreenPrimary)
