@@ -4,7 +4,7 @@ import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import com.example.data.db.AppDatabase
-import com.example.data.model.Badge
+import com.example.data.model.BadgeWithProgress
 import com.example.data.model.Lesson
 import com.example.data.model.Phrase
 import com.example.data.model.UserProfile
@@ -24,7 +24,7 @@ data class BakenyeUiState(
     val selectedWorldId: Int = 1,
     val currentLessons: List<Lesson> = emptyList(),
     val currentPhrases: List<Phrase> = emptyList(),
-    val badges: List<Badge> = emptyList(),
+    val badges: List<BadgeWithProgress> = emptyList(),
     val activeTab: NavigationTab = NavigationTab.LEARN,
     val activeLesson: Lesson? = null,
     val activePhraseIndex: Int = 0,
@@ -46,6 +46,9 @@ enum class NavigationTab {
 class BakenyeViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: BakenyeRepository
+    private val syncManager: com.example.sync.SyncManager
+
+    val syncState: StateFlow<com.example.sync.SyncState>
 
     private val _selectedWorldId = MutableStateFlow(1)
     private val _activeTab = MutableStateFlow(NavigationTab.LEARN)
@@ -65,7 +68,13 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
 
     init {
         val database = AppDatabase.getDatabase(application)
-        repository = BakenyeRepository(database.bakenyeDao())
+        repository = BakenyeRepository(database)
+        syncManager = com.example.sync.SyncManager(
+            outboxDao = database.syncOutboxDao(),
+            transport = com.example.sync.SyncTransportProvider.getTransport(),
+            connectivityMonitor = com.example.sync.ConnectivityMonitor(application)
+        )
+        syncState = syncManager.syncState
 
         viewModelScope.launch {
             repository.seedInitialDataIfEmpty()
@@ -238,6 +247,12 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
 
     fun loadPhrasesForWorld(worldId: Int) = repository.getPhrasesForWorld(worldId)
     fun loadLessonsForWorld(worldId: Int) = repository.getLessonsForWorld(worldId)
+
+    fun syncNow() {
+        viewModelScope.launch {
+            syncManager.syncNow()
+        }
+    }
 }
 
 private data class Quad<A, B, C, D>(val first: A, val second: B, val third: C, val fourth: D)

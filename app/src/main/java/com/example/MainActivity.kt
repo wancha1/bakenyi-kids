@@ -15,8 +15,10 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Task 3: Global Exception Handler for crash diagnostics
+        val originalHandler = Thread.getDefaultUncaughtExceptionHandler()
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
             Log.e("BAKENYE_CRASH", "FATAL CRASH in thread: ${thread.name}", throwable)
+            originalHandler?.uncaughtException(thread, throwable)
         }
 
         Log.d("WORLD_ENGINE_DEBUG", "MainActivity onCreate - launching World Engine / Fishing Area slice")

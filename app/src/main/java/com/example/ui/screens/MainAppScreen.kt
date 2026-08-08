@@ -78,7 +78,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import com.example.R
 import com.example.data.model.Badge
+import com.example.data.model.BadgeWithProgress
 import com.example.data.model.Lesson
+import com.example.data.model.LessonWithProgress
 import com.example.data.model.Phrase
 import com.example.data.model.World
 import com.example.ui.BakenyeUiState
@@ -513,7 +515,7 @@ fun LearnWorldMapScreen(viewModel: BakenyeViewModel, state: BakenyeUiState) {
                 items(lessons) { lesson ->
                     LessonNodeItem(
                         lesson = lesson,
-                        onNodeClick = { viewModel.startLesson(lesson) }
+                        onNodeClick = { viewModel.startLesson(lesson.lesson) }
                     )
                 }
             }
@@ -524,7 +526,7 @@ fun LearnWorldMapScreen(viewModel: BakenyeViewModel, state: BakenyeUiState) {
             onClick = {
                 val nextLesson = lessons.firstOrNull { !it.isCompleted && !it.isLocked } ?: lessons.firstOrNull()
                 if (nextLesson != null) {
-                    viewModel.startLesson(nextLesson)
+                    viewModel.startLesson(nextLesson.lesson)
                 }
             },
             modifier = Modifier
@@ -556,7 +558,7 @@ fun LearnWorldMapScreen(viewModel: BakenyeViewModel, state: BakenyeUiState) {
 }
 
 @Composable
-fun LessonNodeItem(lesson: Lesson, onNodeClick: () -> Unit) {
+fun LessonNodeItem(lesson: LessonWithProgress, onNodeClick: () -> Unit) {
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = Modifier
@@ -905,7 +907,7 @@ fun RewardCelebrationModal(stars: Int, onDismiss: () -> Unit) {
 }
 
 @Composable
-fun RankLeaderboardScreen(badges: List<Badge>) {
+fun RankLeaderboardScreen(badges: List<BadgeWithProgress>) {
     Column(
         modifier = Modifier
             .fillMaxSize()

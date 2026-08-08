@@ -6,10 +6,13 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 import com.example.data.model.Badge
+import com.example.data.model.ChildBadgeUnlockEntity
 import com.example.data.model.ChildDiscoveryEntity
+import com.example.data.model.ChildLessonProgressEntity
 import com.example.data.model.Lesson
 import com.example.data.model.LocationProgressEntity
 import com.example.data.model.Phrase
+import com.example.data.model.SyncOutboxEntity
 import com.example.data.model.UserProfile
 import com.example.data.model.VocabularyEntity
 import com.example.data.model.World
@@ -160,6 +163,144 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
     }
 }
 
+val MIGRATION_3_4 = object : Migration(3, 4) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        val now = System.currentTimeMillis()
+
+        // 1. Create child_lesson_progress table
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `child_lesson_progress` (
+                `childProfileId` TEXT NOT NULL,
+                `lessonId` TEXT NOT NULL,
+                `isCompleted` INTEGER NOT NULL,
+                `updatedAtTimestamp` INTEGER NOT NULL,
+                `completedAtTimestamp` INTEGER,
+                PRIMARY KEY(`childProfileId`, `lessonId`)
+            )
+            """.trimIndent()
+        )
+
+        // 2. Migrate existing completed lessons from `lessons` table where isCompleted = 1
+        db.execSQL(
+            """
+            INSERT INTO `child_lesson_progress` (childProfileId, lessonId, isCompleted, updatedAtTimestamp, completedAtTimestamp)
+            SELECT
+                COALESCE((SELECT id FROM user_profile LIMIT 1), '00000000-0000-0000-0000-000000000001'),
+                lessonId,
+                isCompleted,
+                $now,
+                $now
+            FROM `lessons`
+            WHERE isCompleted = 1
+            """.trimIndent()
+        )
+
+        // 3. Re-create `lessons` table without `isCompleted` column
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `lessons_new` (
+                `lessonId` TEXT NOT NULL,
+                `worldId` INTEGER NOT NULL,
+                `title` TEXT NOT NULL,
+                `subtitle` TEXT NOT NULL,
+                `iconEmoji` TEXT NOT NULL,
+                `isLocked` INTEGER NOT NULL,
+                `starReward` INTEGER NOT NULL,
+                PRIMARY KEY(`lessonId`)
+            )
+            """.trimIndent()
+        )
+
+        db.execSQL(
+            """
+            INSERT INTO `lessons_new` (lessonId, worldId, title, subtitle, iconEmoji, isLocked, starReward)
+            SELECT lessonId, worldId, title, subtitle, iconEmoji, isLocked, starReward FROM `lessons`
+            """.trimIndent()
+        )
+
+        db.execSQL("DROP TABLE `lessons`")
+        db.execSQL("ALTER TABLE `lessons_new` RENAME TO `lessons`")
+
+        // 4. Create child_badge_unlocks table
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `child_badge_unlocks` (
+                `childProfileId` TEXT NOT NULL,
+                `badgeId` TEXT NOT NULL,
+                `isUnlocked` INTEGER NOT NULL,
+                `updatedAtTimestamp` INTEGER NOT NULL,
+                `unlockedAtTimestamp` INTEGER,
+                PRIMARY KEY(`childProfileId`, `badgeId`)
+            )
+            """.trimIndent()
+        )
+
+        // 5. Migrate existing unlocked badges from `badges` table where isUnlocked = 1
+        db.execSQL(
+            """
+            INSERT INTO `child_badge_unlocks` (childProfileId, badgeId, isUnlocked, updatedAtTimestamp, unlockedAtTimestamp)
+            SELECT
+                COALESCE((SELECT id FROM user_profile LIMIT 1), '00000000-0000-0000-0000-000000000001'),
+                id,
+                isUnlocked,
+                $now,
+                $now
+            FROM `badges`
+            WHERE isUnlocked = 1
+            """.trimIndent()
+        )
+
+        // 6. Re-create `badges` table without `isUnlocked` column
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `badges_new` (
+                `id` TEXT NOT NULL,
+                `title` TEXT NOT NULL,
+                `description` TEXT NOT NULL,
+                `iconEmoji` TEXT NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent()
+        )
+
+        db.execSQL(
+            """
+            INSERT INTO `badges_new` (id, title, description, iconEmoji)
+            SELECT id, title, description, iconEmoji FROM `badges`
+            """.trimIndent()
+        )
+
+        db.execSQL("DROP TABLE `badges`")
+        db.execSQL("ALTER TABLE `badges_new` RENAME TO `badges`")
+    }
+}
+
+val MIGRATION_4_5 = object : Migration(4, 5) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `sync_outbox` (
+                `id` TEXT NOT NULL,
+                `childProfileId` TEXT NOT NULL,
+                `entityType` TEXT NOT NULL,
+                `entityId` TEXT NOT NULL,
+                `operation` TEXT NOT NULL,
+                `payloadJson` TEXT NOT NULL,
+                `createdAtTimestamp` INTEGER NOT NULL,
+                `updatedAtTimestamp` INTEGER NOT NULL,
+                `attemptCount` INTEGER NOT NULL,
+                `lastAttemptAtTimestamp` INTEGER,
+                `nextAttemptAtTimestamp` INTEGER,
+                `status` TEXT NOT NULL,
+                `lastError` TEXT,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent()
+        )
+    }
+}
+
 @Database(
     entities = [
         UserProfile::class,
@@ -169,13 +310,17 @@ val MIGRATION_2_3 = object : Migration(2, 3) {
         Badge::class,
         VocabularyEntity::class,
         ChildDiscoveryEntity::class,
-        LocationProgressEntity::class
+        LocationProgressEntity::class,
+        ChildLessonProgressEntity::class,
+        ChildBadgeUnlockEntity::class,
+        SyncOutboxEntity::class
     ],
-    version = 3,
+    version = 5,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun bakenyeDao(): BakenyeDao
+    abstract fun syncOutboxDao(): SyncOutboxDao
 
     companion object {
         @Volatile
@@ -184,13 +329,13 @@ abstract class AppDatabase : RoomDatabase() {
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 try {
-                    Log.d("DATABASE_DEBUG", "Initializing AppDatabase version 3 with MIGRATION_1_2 and MIGRATION_2_3")
+                    Log.d("DATABASE_DEBUG", "Initializing AppDatabase version 5 with MIGRATIONS 1_2, 2_3, 3_4, 4_5")
                     val instance = Room.databaseBuilder(
                         context.applicationContext,
                         AppDatabase::class.java,
                         "bakenye_kids_db"
                     )
-                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
                         .build()
                     INSTANCE = instance
                     Log.d("DATABASE_DEBUG", "AppDatabase initialized successfully")

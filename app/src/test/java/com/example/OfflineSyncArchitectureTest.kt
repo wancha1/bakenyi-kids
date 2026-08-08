@@ -8,6 +8,8 @@ import androidx.test.core.app.ApplicationProvider
 import com.example.data.db.AppDatabase
 import com.example.data.db.MIGRATION_1_2
 import com.example.data.db.MIGRATION_2_3
+import com.example.data.db.MIGRATION_3_4
+import com.example.data.db.MIGRATION_4_5
 import com.example.data.model.ChildDiscoveryEntity
 import com.example.data.model.LocationProgressEntity
 import com.example.data.model.UserProfile
@@ -38,10 +40,10 @@ class OfflineSyncArchitectureTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
-        repository = BakenyeRepository(db.bakenyeDao())
+        repository = BakenyeRepository(db)
     }
 
     @After
@@ -234,5 +236,42 @@ class OfflineSyncArchitectureTest {
         assertNotNull(resultA)
         assertEquals(childAId, resultA?.childProfileId)
         assertEquals(3, resultA?.termsMastered)
+    }
+
+    @Test
+    fun test7_LessonAndBadgeChildIsolation() = runBlocking {
+        repository.seedInitialDataIfEmpty()
+        val childAId = UUID.randomUUID().toString()
+        val childBId = UUID.randomUUID().toString()
+
+        val profileA = UserProfile(id = childAId, name = "Child A")
+        val profileB = UserProfile(id = childBId, name = "Child B")
+        db.bakenyeDao().saveUserProfile(profileA)
+        db.bakenyeDao().saveUserProfile(profileB)
+
+        // Complete lesson L1_2 for Child A
+        repository.completeLesson(childProfileId = childAId, lessonId = "L1_2", starReward = 3, coinReward = 20)
+
+        // Unlock badge B4 for Child A
+        repository.unlockBadge(childProfileId = childAId, badgeId = "B4")
+
+        // Query lessons and badges for Child A and Child B
+        val lessonsA = repository.getLessonsForWorld(childProfileId = childAId, worldId = 1).first()
+        val lessonsB = repository.getLessonsForWorld(childProfileId = childBId, worldId = 1).first()
+
+        val badgesA = repository.getBadgesForChild(childProfileId = childAId).first()
+        val badgesB = repository.getBadgesForChild(childProfileId = childBId).first()
+
+        val lessonL1_2A = lessonsA.find { it.lessonId == "L1_2" }
+        val lessonL1_2B = lessonsB.find { it.lessonId == "L1_2" }
+
+        assertTrue("Child A must have L1_2 completed", lessonL1_2A?.isCompleted == true)
+        assertFalse("Child B must NOT have L1_2 completed", lessonL1_2B?.isCompleted == true)
+
+        val badgeB4A = badgesA.find { it.id == "B4" }
+        val badgeB4B = badgesB.find { it.id == "B4" }
+
+        assertTrue("Child A must have B4 unlocked", badgeB4A?.isUnlocked == true)
+        assertFalse("Child B must NOT have B4 unlocked", badgeB4B?.isUnlocked == true)
     }
 }

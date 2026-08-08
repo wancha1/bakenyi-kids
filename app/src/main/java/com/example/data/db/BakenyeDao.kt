@@ -5,7 +5,9 @@ import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import com.example.data.model.Badge
+import com.example.data.model.ChildBadgeUnlockEntity
 import com.example.data.model.ChildDiscoveryEntity
+import com.example.data.model.ChildLessonProgressEntity
 import com.example.data.model.Lesson
 import com.example.data.model.LocationProgressEntity
 import com.example.data.model.Phrase
@@ -21,6 +23,9 @@ interface BakenyeDao {
 
     @Query("SELECT * FROM user_profile WHERE id = :childProfileId")
     fun getUserProfileById(childProfileId: String): Flow<UserProfile?>
+
+    @Query("SELECT * FROM user_profile WHERE id = :childProfileId")
+    suspend fun getUserProfileByIdOnce(childProfileId: String): UserProfile?
 
     @Query("SELECT * FROM user_profile LIMIT 1")
     suspend fun getFirstUserProfile(): UserProfile?
@@ -49,8 +54,17 @@ interface BakenyeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveLessons(lessons: List<Lesson>)
 
-    @Query("UPDATE lessons SET isCompleted = 1 WHERE lessonId = :lessonId")
-    suspend fun markLessonCompleted(lessonId: String)
+    @Query("SELECT * FROM child_lesson_progress WHERE childProfileId = :childProfileId")
+    fun getLessonProgressForChild(childProfileId: String): Flow<List<ChildLessonProgressEntity>>
+
+    @Query("SELECT * FROM child_lesson_progress WHERE childProfileId = :childProfileId AND lessonId = :lessonId")
+    fun getLessonProgress(childProfileId: String, lessonId: String): Flow<ChildLessonProgressEntity?>
+
+    @Query("SELECT COUNT(*) FROM child_lesson_progress WHERE childProfileId = :childProfileId AND lessonId = :lessonId")
+    suspend fun getLessonProgressCount(childProfileId: String, lessonId: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveLessonProgress(progress: ChildLessonProgressEntity)
 
     @Query("SELECT * FROM phrases WHERE worldId = :worldId")
     fun getPhrasesForWorld(worldId: Int): Flow<List<Phrase>>
@@ -69,6 +83,18 @@ interface BakenyeDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveBadges(badges: List<Badge>)
+
+    @Query("SELECT * FROM child_badge_unlocks WHERE childProfileId = :childProfileId")
+    fun getUnlockedBadgesForChild(childProfileId: String): Flow<List<ChildBadgeUnlockEntity>>
+
+    @Query("SELECT * FROM child_badge_unlocks WHERE childProfileId = :childProfileId AND badgeId = :badgeId")
+    fun getBadgeUnlock(childProfileId: String, badgeId: String): Flow<ChildBadgeUnlockEntity?>
+
+    @Query("SELECT COUNT(*) FROM child_badge_unlocks WHERE childProfileId = :childProfileId AND badgeId = :badgeId")
+    suspend fun getBadgeUnlockCount(childProfileId: String, badgeId: String): Int
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveBadgeUnlock(unlock: ChildBadgeUnlockEntity)
 
     @Query("UPDATE user_profile SET stars = stars + :addStars, coins = coins + :addCoins, updatedAtTimestamp = :updatedAt WHERE id = :childProfileId")
     suspend fun rewardUser(childProfileId: String, addStars: Int, addCoins: Int, updatedAt: Long = System.currentTimeMillis())

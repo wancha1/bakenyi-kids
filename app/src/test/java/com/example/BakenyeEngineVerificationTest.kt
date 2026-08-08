@@ -8,6 +8,8 @@ import com.example.audio.AuthenticAudioManager
 import com.example.data.db.AppDatabase
 import com.example.data.db.MIGRATION_1_2
 import com.example.data.db.MIGRATION_2_3
+import com.example.data.db.MIGRATION_3_4
+import com.example.data.db.MIGRATION_4_5
 import com.example.data.model.VocabularyEntity
 import com.example.data.repository.BakenyeRepository
 import com.example.ui.BakenyeViewModel
@@ -37,10 +39,10 @@ class BakenyeEngineVerificationTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3)
+            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
             .allowMainThreadQueries()
             .build()
-        repository = BakenyeRepository(db.bakenyeDao())
+        repository = BakenyeRepository(db)
     }
 
     @After
@@ -66,6 +68,14 @@ class BakenyeEngineVerificationTest {
         val cursorUser = db.openHelper.readableDatabase.query("SELECT * FROM user_profile")
         assertNotNull(cursorUser)
         cursorUser.close()
+
+        val cursorLessonProg = db.openHelper.readableDatabase.query("SELECT * FROM child_lesson_progress")
+        assertNotNull(cursorLessonProg)
+        cursorLessonProg.close()
+
+        val cursorBadgeUnlock = db.openHelper.readableDatabase.query("SELECT * FROM child_badge_unlocks")
+        assertNotNull(cursorBadgeUnlock)
+        cursorBadgeUnlock.close()
     }
 
     @Test
