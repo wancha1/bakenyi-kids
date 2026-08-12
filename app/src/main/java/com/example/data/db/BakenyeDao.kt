@@ -99,6 +99,12 @@ interface BakenyeDao {
     @Query("UPDATE user_profile SET stars = stars + :addStars, coins = coins + :addCoins, updatedAtTimestamp = :updatedAt WHERE id = :childProfileId")
     suspend fun rewardUser(childProfileId: String, addStars: Int, addCoins: Int, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("SELECT completedAtTimestamp FROM child_lesson_progress WHERE childProfileId = :childProfileId AND isCompleted = 1 AND completedAtTimestamp IS NOT NULL ORDER BY completedAtTimestamp DESC")
+    suspend fun getCompletedLessonTimestamps(childProfileId: String): List<Long>
+
+    @Query("UPDATE user_profile SET streakDays = :newStreak, updatedAtTimestamp = :updatedAt WHERE id = :childProfileId")
+    suspend fun updateStreak(childProfileId: String, newStreak: Int, updatedAt: Long = System.currentTimeMillis())
+
     // World Engine Vocabulary & Progress
     @Query("SELECT * FROM vocabulary_items WHERE locationId = :locationId")
     fun getVocabularyForLocation(locationId: String): Flow<List<VocabularyEntity>>

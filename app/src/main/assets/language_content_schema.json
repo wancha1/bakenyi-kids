@@ -1,0 +1,18 @@
+[
+  {
+    "contentId": "schema_example_001",
+    "englishText": "Tree",
+    "lukenyeText": null,
+    "englishMeaning": "A tall living plant in the sanctuary grove",
+    "lukenyeAudioAsset": "AUDIO_PENDING",
+    "englishAudioAsset": "assets/audio/en_tree.mp3",
+    "pronunciation": null,
+    "culturalContext": "CULTURAL_CONTENT_PENDING",
+    "contentCategory": "nature",
+    "ageSuitability": "4-7",
+    "verificationStatus": "PENDING_VERIFICATION",
+    "source": "Bakenyi_Kids_Human_Language_Team_Template",
+    "version": 1,
+    "active": true
+  }
+]

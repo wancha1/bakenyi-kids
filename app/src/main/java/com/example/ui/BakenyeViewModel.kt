@@ -3,6 +3,7 @@ package com.example.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.example.audio.AuthenticAudioManager
 import com.example.data.db.AppDatabase
 import com.example.data.model.BadgeWithProgress
 import com.example.data.model.Lesson
@@ -47,6 +48,7 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
 
     private val repository: BakenyeRepository
     private val syncManager: com.example.sync.SyncManager
+    private val audioManager = AuthenticAudioManager.getInstance(application)
 
     val syncState: StateFlow<com.example.sync.SyncState>
 
@@ -78,6 +80,7 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
 
         viewModelScope.launch {
             repository.seedInitialDataIfEmpty()
+            repository.recalculateAndUpdateStreak()
         }
 
         val dbState = combine(
@@ -228,6 +231,7 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
                     _earnedRewardStars.value = 3
                     _showRewardModal.value = true
                     _activeLesson.value = null
+                    playSuccessSound()
                 }
             }
         }
@@ -237,12 +241,31 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
         _showRewardModal.value = false
     }
 
+    fun completeQuizExam() {
+        val profileId = uiState.value.profile.id
+        viewModelScope.launch {
+            if (profileId.isNotEmpty()) {
+                repository.completeLesson(childProfileId = profileId, lessonId = "quiz_exam_${System.currentTimeMillis()}", starReward = 5, coinReward = 30)
+            } else {
+                repository.completeLesson(lessonId = "quiz_exam_${System.currentTimeMillis()}", starReward = 5, coinReward = 30)
+            }
+            playSuccessSound()
+        }
+    }
+
     fun playAudioPronunciation() {
         _isPlayingAudio.value = true
-        viewModelScope.launch {
-            kotlinx.coroutines.delay(1200)
+        audioManager.playPronunciation("bakenye_sample") {
             _isPlayingAudio.value = false
         }
+    }
+
+    fun playSuccessSound() {
+        audioManager.playSuccessSound()
+    }
+
+    fun playFailureSound() {
+        audioManager.playFailureSound()
     }
 
     fun loadPhrasesForWorld(worldId: Int) = repository.getPhrasesForWorld(worldId)

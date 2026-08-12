@@ -16,6 +16,8 @@ import com.example.data.model.SyncOutboxEntity
 import com.example.data.model.UserProfile
 import com.example.data.model.VocabularyEntity
 import com.example.data.model.World
+import com.example.language.db.LanguageContentDao
+import com.example.language.model.LanguageContentEntity
 
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
@@ -301,6 +303,33 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
     }
 }
 
+val MIGRATION_5_6 = object : Migration(5, 6) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `language_content` (
+                `contentId` TEXT NOT NULL,
+                `englishText` TEXT NOT NULL,
+                `lukenyeText` TEXT,
+                `englishMeaning` TEXT,
+                `lukenyeAudioAsset` TEXT,
+                `englishAudioAsset` TEXT,
+                `pronunciation` TEXT,
+                `culturalContext` TEXT,
+                `contentCategory` TEXT NOT NULL,
+                `ageSuitability` TEXT NOT NULL,
+                `verificationStatus` TEXT NOT NULL,
+                `source` TEXT,
+                `version` INTEGER NOT NULL,
+                `active` INTEGER NOT NULL,
+                `updatedAtTimestamp` INTEGER NOT NULL,
+                PRIMARY KEY(`contentId`)
+            )
+            """.trimIndent()
+        )
+    }
+}
+
 @Database(
     entities = [
         UserProfile::class,
@@ -313,14 +342,16 @@ val MIGRATION_4_5 = object : Migration(4, 5) {
         LocationProgressEntity::class,
         ChildLessonProgressEntity::class,
         ChildBadgeUnlockEntity::class,
-        SyncOutboxEntity::class
+        SyncOutboxEntity::class,
+        LanguageContentEntity::class
     ],
-    version = 5,
+    version = 6,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
     abstract fun bakenyeDao(): BakenyeDao
     abstract fun syncOutboxDao(): SyncOutboxDao
+    abstract fun languageContentDao(): LanguageContentDao
 
     companion object {
         @Volatile
@@ -329,13 +360,13 @@ abstract class AppDatabase : RoomDatabase() {
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 try {
-                    Log.d("DATABASE_DEBUG", "Initializing AppDatabase version 5 with MIGRATIONS 1_2, 2_3, 3_4, 4_5")
+                    Log.d("DATABASE_DEBUG", "Initializing AppDatabase version 6 with MIGRATIONS 1_2, 2_3, 3_4, 4_5, 5_6")
                     val instance = Room.databaseBuilder(
                         context.applicationContext,
                         AppDatabase::class.java,
                         "bakenye_kids_db"
                     )
-                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6)
                         .build()
                     INSTANCE = instance
                     Log.d("DATABASE_DEBUG", "AppDatabase initialized successfully")

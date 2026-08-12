@@ -194,6 +194,71 @@ class BakenyeRepository(
         }
     }
 
+    fun calculateStreak(completedTimestamps: List<Long>, now: Long = System.currentTimeMillis()): Int {
+        if (completedTimestamps.isEmpty()) return 0
+
+        val dateFormat = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US)
+        val calendar = java.util.Calendar.getInstance()
+
+        val completedDates = completedTimestamps.map { ts ->
+            dateFormat.format(java.util.Date(ts))
+        }.toSet()
+
+        calendar.timeInMillis = now
+        val todayStr = dateFormat.format(calendar.time)
+
+        calendar.add(java.util.Calendar.DAY_OF_YEAR, -1)
+        val yesterdayStr = dateFormat.format(calendar.time)
+
+        val streakStartsFromToday = completedDates.contains(todayStr)
+        val streakStartsFromYesterday = completedDates.contains(yesterdayStr)
+
+        if (!streakStartsFromToday && !streakStartsFromYesterday) {
+            return 0
+        }
+
+        var streakCount = 0
+        val currentCheckCal = java.util.Calendar.getInstance()
+        currentCheckCal.timeInMillis = now
+
+        if (!streakStartsFromToday) {
+            currentCheckCal.add(java.util.Calendar.DAY_OF_YEAR, -1)
+        }
+
+        while (true) {
+            val checkStr = dateFormat.format(currentCheckCal.time)
+            if (completedDates.contains(checkStr)) {
+                streakCount++
+                currentCheckCal.add(java.util.Calendar.DAY_OF_YEAR, -1)
+            } else {
+                break
+            }
+        }
+
+        return streakCount
+    }
+
+    suspend fun recalculateAndUpdateStreak(childProfileId: String): Int {
+        val timestamps = dao.getCompletedLessonTimestamps(childProfileId)
+        val streak = calculateStreak(timestamps)
+        dao.updateStreak(childProfileId, streak)
+        val updatedProfile = dao.getUserProfileByIdOnce(childProfileId)
+        if (updatedProfile != null && outboxDao != null) {
+            val profilePayload = OutboxPayloadSerializer.serializeUserProfile(updatedProfile)
+            enqueueOrCoalesceOutbox(childProfileId, "USER_PROFILE", childProfileId, "UPDATE", profilePayload, System.currentTimeMillis())
+        }
+        return streak
+    }
+
+    suspend fun recalculateAndUpdateStreak(): Int {
+        val activeProfile = dao.getFirstUserProfile()
+        return if (activeProfile != null) {
+            recalculateAndUpdateStreak(activeProfile.id)
+        } else {
+            0
+        }
+    }
+
     suspend fun completeLesson(childProfileId: String, lessonId: String, starReward: Int, coinReward: Int) {
         val now = System.currentTimeMillis()
         val lessonProgress = ChildLessonProgressEntity(
@@ -211,6 +276,9 @@ class BakenyeRepository(
                 dao.saveLessonProgress(lessonProgress)
                 enqueueOrCoalesceOutbox(childProfileId, "CHILD_LESSON_PROGRESS", lessonId, "UPDATE", lessonPayload, now)
                 dao.rewardUser(childProfileId = childProfileId, addStars = starReward, addCoins = coinReward, updatedAt = now)
+                val timestamps = dao.getCompletedLessonTimestamps(childProfileId)
+                val newStreak = calculateStreak(timestamps, now)
+                dao.updateStreak(childProfileId, newStreak, now)
                 val updatedProfile = dao.getUserProfileByIdOnce(childProfileId)
                 if (updatedProfile != null) {
                     val profilePayload = OutboxPayloadSerializer.serializeUserProfile(updatedProfile)
@@ -220,6 +288,9 @@ class BakenyeRepository(
         } else {
             dao.saveLessonProgress(lessonProgress)
             dao.rewardUser(childProfileId = childProfileId, addStars = starReward, addCoins = coinReward, updatedAt = now)
+            val timestamps = dao.getCompletedLessonTimestamps(childProfileId)
+            val newStreak = calculateStreak(timestamps, now)
+            dao.updateStreak(childProfileId, newStreak, now)
             val updatedProfile = dao.getUserProfileByIdOnce(childProfileId)
             if (updatedProfile != null && outboxDao != null) {
                 val profilePayload = OutboxPayloadSerializer.serializeUserProfile(updatedProfile)
