@@ -6,16 +6,13 @@ import androidx.compose.animation.core.spring
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
@@ -38,8 +35,8 @@ import androidx.compose.ui.unit.sp
 
 @Composable
 fun InhabitantAnchor(
-    inhabitant: SanctuaryInhabitant,
-    onTap: (SanctuaryInhabitant) -> Unit,
+    storybookObject: StorybookObject,
+    onTap: (StorybookObject) -> Unit,
     modifier: Modifier = Modifier,
     xOffset: Dp = 0.dp,
     yOffset: Dp = 0.dp
@@ -53,57 +50,49 @@ fun InhabitantAnchor(
             stiffness = Spring.StiffnessLow
         ),
         finishedListener = { isTapped = false },
-        label = "InhabitantBounce"
+        label = "ObjectBounce"
     )
 
     Column(
         horizontalAlignment = Alignment.CenterHorizontally,
         modifier = modifier
             .offset(x = xOffset, y = yOffset)
-            .testTag("inhabitant_anchor_${inhabitant.id}")
+            .testTag("inhabitant_anchor_${storybookObject.id}")
     ) {
-        // Organic Tactile Anchor Hit Target (Minimum 64dp)
         Box(
             modifier = Modifier
                 .size(72.dp)
                 .scale(scaleState)
                 .clip(CircleShape)
-                .background(Color(0xFFFFF8E1).copy(alpha = 0.92f))
+                .background(Color(0xFFFFF8E1).copy(alpha = 0.95f))
                 .border(3.dp, Color(0xFFD2B48C), CircleShape)
                 .shadow(6.dp, CircleShape)
                 .clickable {
                     isTapped = true
-                    onTap(inhabitant)
+                    onTap(storybookObject)
                 },
             contentAlignment = Alignment.Center
         ) {
             Text(
-                text = inhabitant.emojiIcon,
+                text = storybookObject.illustrationEmoji,
                 fontSize = 40.sp
             )
         }
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Natural Object Label Tag (Nature-inspired Ochre / Bark cloth)
         Box(
             modifier = Modifier
                 .clip(RoundedCornerShape(14.dp))
                 .background(Color(0xFF3E2723).copy(alpha = 0.85f))
                 .padding(horizontal = 10.dp, vertical = 4.dp)
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = inhabitant.nativeTitle,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFFECB3)
-                )
-                if (inhabitant.nativeAudioPhrase.isNotBlank()) {
-                    Spacer(modifier = Modifier.width(4.dp))
-                    Text(text = "🔊", fontSize = 10.sp)
-                }
-            }
+            Text(
+                text = storybookObject.labelLukenye,
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFFFFECB3)
+            )
         }
     }
 }

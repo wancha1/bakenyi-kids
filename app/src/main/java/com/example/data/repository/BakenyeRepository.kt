@@ -14,6 +14,7 @@ import com.example.data.model.LessonWithProgress
 import com.example.data.model.LocationProgressEntity
 import com.example.data.model.OutboxPayloadSerializer
 import com.example.data.model.Phrase
+import com.example.data.model.SanctuaryStateEntity
 import com.example.data.model.SyncOutboxEntity
 import com.example.data.model.UserProfile
 import com.example.data.model.VocabularyEntity
@@ -34,6 +35,19 @@ class BakenyeRepository(
 
     val userProfile: Flow<UserProfile?> = dao.getPrimaryUserProfile()
     val worlds: Flow<List<World>> = dao.getAllWorlds()
+    val sanctuaryState: Flow<SanctuaryStateEntity?> = dao.getSanctuaryState()
+
+    suspend fun saveSanctuaryState(biome: String, timeOfDay: String) {
+        val now = System.currentTimeMillis()
+        dao.saveSanctuaryState(
+            SanctuaryStateEntity(
+                id = "PRIMARY_SANCTUARY",
+                activeBiome = biome,
+                timeOfDay = timeOfDay,
+                updatedAtTimestamp = now
+            )
+        )
+    }
 
     @OptIn(ExperimentalCoroutinesApi::class)
     val badges: Flow<List<BadgeWithProgress>> = userProfile.flatMapLatest { profile ->

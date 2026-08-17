@@ -8,15 +8,21 @@ import com.example.data.db.AppDatabase
 import com.example.data.model.BadgeWithProgress
 import com.example.data.model.Lesson
 import com.example.data.model.Phrase
+import com.example.data.model.SanctuaryStateEntity
 import com.example.data.model.UserProfile
 import com.example.data.model.World
 import com.example.data.repository.BakenyeRepository
+import com.example.ui.sanctuary.DiurnalTimeOfDay
+import com.example.ui.sanctuary.SanctuaryBiome
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 data class BakenyeUiState(
@@ -51,6 +57,7 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
     private val audioManager = AuthenticAudioManager.getInstance(application)
 
     val syncState: StateFlow<com.example.sync.SyncState>
+    val sanctuaryState: StateFlow<SanctuaryStateEntity>
 
     private val _selectedWorldId = MutableStateFlow(1)
     private val _activeTab = MutableStateFlow(NavigationTab.LEARN)
@@ -78,9 +85,20 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
         )
         syncState = syncManager.syncState
 
+        sanctuaryState = repository.sanctuaryState
+            .map { it ?: SanctuaryStateEntity() }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = SanctuaryStateEntity()
+            )
+
         viewModelScope.launch {
             repository.seedInitialDataIfEmpty()
-            repository.recalculateAndUpdateStreak()
+            while (isActive) {
+                delay(120_000L)
+                advanceSanctuaryTimeOfDay()
+            }
         }
 
         val dbState = combine(
@@ -241,16 +259,29 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
         _showRewardModal.value = false
     }
 
-    fun completeQuizExam() {
-        val profileId = uiState.value.profile.id
+    fun updateSanctuaryBiome(biome: SanctuaryBiome) {
+        val current = sanctuaryState.value
         viewModelScope.launch {
-            if (profileId.isNotEmpty()) {
-                repository.completeLesson(childProfileId = profileId, lessonId = "quiz_exam_${System.currentTimeMillis()}", starReward = 5, coinReward = 30)
-            } else {
-                repository.completeLesson(lessonId = "quiz_exam_${System.currentTimeMillis()}", starReward = 5, coinReward = 30)
-            }
-            playSuccessSound()
+            repository.saveSanctuaryState(biome.name, current.timeOfDay)
         }
+    }
+
+    fun updateSanctuaryTimeOfDay(timeOfDay: DiurnalTimeOfDay) {
+        val current = sanctuaryState.value
+        viewModelScope.launch {
+            repository.saveSanctuaryState(current.activeBiome, timeOfDay.name)
+        }
+    }
+
+    fun advanceSanctuaryTimeOfDay() {
+        val current = sanctuaryState.value
+        val currentEnum = try {
+            DiurnalTimeOfDay.valueOf(current.timeOfDay)
+        } catch (e: Exception) {
+            DiurnalTimeOfDay.MORNING_DAWN
+        }
+        val nextEnum = currentEnum.next()
+        updateSanctuaryTimeOfDay(nextEnum)
     }
 
     fun playAudioPronunciation() {

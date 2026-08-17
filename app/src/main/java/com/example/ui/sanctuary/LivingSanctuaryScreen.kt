@@ -1,9 +1,11 @@
 package com.example.ui.sanctuary
 
-import android.util.Log
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -19,26 +21,27 @@ import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.lazy.LazyRow
-import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
@@ -49,89 +52,49 @@ import androidx.compose.ui.unit.sp
 import com.example.audio.AuthenticAudioManager
 import com.example.language.context.AppLanguageContext
 import com.example.language.context.LanguageMode
-import com.example.language.model.VerificationStatus
+import com.example.language.enforcer.VerificationStateEnforcer
+import com.example.language.model.LanguageContent
+import com.example.language.model.RenderableLanguageContent
 import com.example.ui.BakenyeViewModel
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LivingSanctuaryScreen(
     viewModel: BakenyeViewModel,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val audioManager = remember { AuthenticAudioManager.getInstance(context) }
     val languageContext = remember { AppLanguageContext(context) }
     val currentLanguageMode by languageContext.currentLanguageMode.collectAsState()
 
-    var activeBiome by remember { mutableStateOf(SanctuaryBiome.RIVER_WETLANDS) }
-    var timeOfDay by remember { mutableStateOf(DiurnalTimeOfDay.MORNING_DAWN) }
-    var showParentOverlay by remember { mutableStateOf(false) }
-    var activeSpeechBubble by remember { mutableStateOf<String?>(null) }
+    // Persistent state in Room
+    val sanctuaryStateEntity by viewModel.sanctuaryState.collectAsState()
 
-    // Pre-configured Living Ecosystem Inhabitants
-    val inhabitants = remember {
-        listOf(
-            SanctuaryInhabitant(
-                id = "KIGO_OTTER",
-                name = "Kigo the Otter",
-                nativeTitle = "Eryato (Canoe)",
-                emojiIcon = "🦦",
-                biome = SanctuaryBiome.RIVER_WETLANDS,
-                naturalBehaviorDesc = "Kigo rolls river stones and greets children near the canoe landing.",
-                nativeAudioPhrase = "Oli otya! Weebale okujja ekyato!",
-                englishMeaning = "Hello! Welcome to the canoe landing!",
-                pronunciation = "Oh-lee oh-tyah! Wee-bah-leh oh-koo-jjah eh-kyah-toh!",
-                verificationStatus = VerificationStatus.VERIFIED
-            ),
-            SanctuaryInhabitant(
-                id = "NALUBA_KINGFISHER",
-                name = "Naluba the Kingfisher",
-                nativeTitle = "Ensomba (Fish)",
-                emojiIcon = "🐦",
-                biome = SanctuaryBiome.RIVER_WETLANDS,
-                naturalBehaviorDesc = "Perches on papyrus reeds and dips into water to catch fish.",
-                nativeAudioPhrase = "Laba ensomba mu nnyanja!",
-                englishMeaning = "Look at the fish in the lake!",
-                pronunciation = "Lah-bah en-sohm-bah moo n-nyah-njah!",
-                verificationStatus = VerificationStatus.VERIFIED
-            ),
-            SanctuaryInhabitant(
-                id = "JJAJJA_GRANDMOTHER",
-                name = "JjaJja Grandmother",
-                nativeTitle = "Obwosi (Story)",
-                emojiIcon = "👵🏽",
-                biome = SanctuaryBiome.VILLAGE_LANDING,
-                naturalBehaviorDesc = "Sweeps the clay hearth and shares ancient oral stories.",
-                nativeAudioPhrase = "Tula wano omwana wange, nkuwe ebyomuwendo.",
-                englishMeaning = "Sit here my child, let me share ancient wisdom.",
-                pronunciation = "Too-lah wah-noh oh-mwah-nah wahn-geh...",
-                verificationStatus = VerificationStatus.VERIFIED
-            ),
-            SanctuaryInhabitant(
-                id = "SSOZI_CRANE",
-                name = "Ssozi Crested Crane",
-                nativeTitle = "Engwali (Crested Crane)",
-                emojiIcon = "🦩",
-                biome = SanctuaryBiome.HILLS_AND_MEADOWS,
-                naturalBehaviorDesc = "Performs gentle dancing steps to greet the morning sun.",
-                nativeAudioPhrase = "Jjangu tuzine mu musiri!",
-                englishMeaning = "Come let us dance in the meadow!",
-                pronunciation = "Jjan-goo too-zee-neh moo moo-see-ree!",
-                verificationStatus = VerificationStatus.VERIFIED
-            ),
-            SanctuaryInhabitant(
-                id = "LUMU_MONKEY",
-                name = "Lumu Vervet Monkey",
-                nativeTitle = "Ebibala (Fruit)",
-                emojiIcon = "🐒",
-                biome = SanctuaryBiome.BAOBAB_FOREST,
-                naturalBehaviorDesc = "Swings in the baobab canopy dropping wild figs into water.",
-                nativeAudioPhrase = "Liba ebibala ebimyufu!",
-                englishMeaning = "Look at the ripe sweet fruit!",
-                pronunciation = "Lee-bah eh-bee-bah-lah eh-bee-myoo-foo!",
-                verificationStatus = VerificationStatus.VERIFIED
-            )
-        )
+    val spreads = remember { getStorybookSpreads() }
+
+    // Map Room activeBiome to page index
+    val initialPageIndex = remember(sanctuaryStateEntity.activeBiome) {
+        val index = spreads.indexOfFirst { it.biome.name == sanctuaryStateEntity.activeBiome }
+        if (index >= 0) index else 0
     }
+
+    val pagerState = rememberPagerState(
+        initialPage = initialPageIndex,
+        pageCount = { spreads.size }
+    )
+
+    // Save spread to Room DB on page change
+    LaunchedEffect(pagerState.currentPage) {
+        val spread = spreads[pagerState.currentPage]
+        viewModel.updateSanctuaryBiome(spread.biome)
+    }
+
+    var showParentOverlay by remember { mutableStateOf(false) }
+    var activeObject by remember { mutableStateOf<StorybookObject?>(null) }
+    var activeRenderableContent by remember { mutableStateOf<RenderableLanguageContent?>(null) }
 
     DisposableEffect(Unit) {
         onDispose {
@@ -142,145 +105,86 @@ fun LivingSanctuaryScreen(
     Box(
         modifier = modifier
             .fillMaxSize()
+            .background(Color(0xFFF9F6EE)) // Warm linen parchment background
             .testTag("living_sanctuary_screen")
     ) {
-        // 1. Edge-to-Edge Interactive Sanctuary Canvas
-        SanctuaryCanvas(
-            timeOfDay = timeOfDay,
-            activeBiome = activeBiome,
-            modifier = Modifier.fillMaxSize(),
-            onWaterTap = {
-                audioManager.playSuccessSound()
-            }
-        )
-
-        // 2. Inhabitants Anchor Placement for Active Biome
-        val visibleInhabitants = inhabitants.filter { it.biome == activeBiome }
-        visibleInhabitants.forEachIndexed { index, inhabitant ->
-            val xPos = when (index) {
-                0 -> (-60).dp
-                1 -> 70.dp
-                else -> 0.dp
-            }
-            val yPos = when (index) {
-                0 -> 40.dp
-                1 -> (-30).dp
-                else -> 80.dp
-            }
-
-            InhabitantAnchor(
-                inhabitant = inhabitant,
-                onTap = { selected ->
-                    activeSpeechBubble = selected.nativeAudioPhrase
-                    audioManager.playPronunciation("bakenye_sample") {
-                        // Audio completed
-                    }
-                },
-                modifier = Modifier.align(Alignment.Center),
-                xOffset = xPos,
-                yOffset = yPos
-            )
-        }
-
-        // 3. Top Natural Biome Switcher (Embedded into nature)
-        LazyRow(
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(start = 16.dp, top = 48.dp, end = 80.dp),
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            items(SanctuaryBiome.values()) { biome ->
-                val isSelected = activeBiome == biome
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(20.dp))
-                        .background(
-                            if (isSelected) Color(0xFF2A9D8F) else Color(0xFF3E2723).copy(alpha = 0.75f)
-                        )
-                        .border(
-                            1.5.dp,
-                            if (isSelected) Color(0xFFE9C46A) else Color(0xFF8D6E63),
-                            RoundedCornerShape(20.dp)
-                        )
-                        .clickable { activeBiome = biome }
-                        .padding(horizontal = 14.dp, vertical = 8.dp)
-                ) {
-                    Text(
-                        text = biome.title,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFFFFF8E1)
-                    )
-                }
-            }
-        }
-
-        // 4. Time of Day Diurnal Cycle Switcher (Sun/Moon Ember)
+        // Picture-Book Frame Container
         Box(
             modifier = Modifier
-                .align(Alignment.BottomStart)
-                .padding(start = 16.dp, bottom = 24.dp)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Color(0xFF3E2723).copy(alpha = 0.80f))
-                .clickable { timeOfDay = timeOfDay.next() }
-                .padding(horizontal = 14.dp, vertical = 8.dp)
+                .fillMaxSize()
+                .padding(horizontal = 8.dp, vertical = 10.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .border(3.dp, Color(0xFFD2B48C), RoundedCornerShape(24.dp))
+                .background(Color(0xFFFFFDF5))
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Text(
-                    text = when (timeOfDay) {
-                        DiurnalTimeOfDay.MORNING_DAWN -> "🌅 Dawn"
-                        DiurnalTimeOfDay.MIDDAY_SUN -> "☀️ Midday"
-                        DiurnalTimeOfDay.EVENING_GOLD -> "🌇 Evening"
-                        DiurnalTimeOfDay.TWILIGHT_DUSK -> "🌙 Twilight"
+            Column(modifier = Modifier.fillMaxSize()) {
+                // 1. Storybook Header
+                StorybookHeader(
+                    currentSpread = spreads[pagerState.currentPage],
+                    totalPages = spreads.size,
+                    onParentGateUnlocked = { showParentOverlay = true }
+                )
+
+                // 2. Full-Screen Horizontal Pager for Storybook Pages
+                HorizontalPager(
+                    state = pagerState,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxWidth()
+                ) { pageIndex ->
+                    val spread = spreads[pageIndex]
+                    StorybookSpreadView(
+                        spread = spread,
+                        currentLanguageMode = currentLanguageMode,
+                        audioManager = audioManager,
+                        onObjectTapped = { obj, renderable ->
+                            activeObject = obj
+                            activeRenderableContent = renderable
+                        }
+                    )
+                }
+
+                // 3. Storybook Footer with Calming Page Swiping & Dots
+                StorybookFooter(
+                    pagerState = pagerState,
+                    totalPages = spreads.size,
+                    onPrevClicked = {
+                        scope.launch {
+                            if (pagerState.currentPage > 0) {
+                                pagerState.animateScrollToPage(pagerState.currentPage - 1)
+                            }
+                        }
                     },
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFFFFF8E1)
+                    onNextClicked = {
+                        scope.launch {
+                            if (pagerState.currentPage < spreads.size - 1) {
+                                pagerState.animateScrollToPage(pagerState.currentPage + 1)
+                            }
+                        }
+                    }
                 )
             }
         }
 
-        // 5. Active Inhabitant Native Speech Bubble (Spoken Heritage Response)
-        activeSpeechBubble?.let { speech ->
-            Card(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 80.dp, start = 24.dp, end = 24.dp)
-                    .clickable { activeSpeechBubble = null },
-                colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E1)),
-                shape = RoundedCornerShape(22.dp),
-                border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFD2B48C))
-            ) {
-                Column(
-                    modifier = Modifier.padding(16.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
-                ) {
-                    Text(
-                        text = "🗣️ \"$speech\"",
-                        fontSize = 15.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF3E2723),
-                        textAlign = TextAlign.Center
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
-                    Text(
-                        text = "(Tap anywhere to close)",
-                        fontSize = 10.sp,
-                        color = Color.Gray
-                    )
-                }
+        // 4. Storybook Object Reading Card (Audio-first interaction display)
+        activeRenderableContent?.let { renderable ->
+            activeObject?.let { obj ->
+                StorybookReadingCard(
+                    storybookObject = obj,
+                    renderable = renderable,
+                    audioManager = audioManager,
+                    onDismiss = {
+                        activeRenderableContent = null
+                        activeObject = null
+                    },
+                    modifier = Modifier
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 60.dp, start = 16.dp, end = 16.dp)
+                )
             }
         }
 
-        // 6. Discreet Embers Gate (Top-Right Parent Area Lock)
-        EmbersGateButton(
-            onGateUnlocked = { showParentOverlay = true },
-            modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(top = 48.dp, end = 16.dp)
-        )
-
-        // 7. Parent Sanctuary Settings Overlay Modal
+        // 5. Parent Gate Overlay Modal
         if (showParentOverlay) {
             ParentSanctuaryOverlay(
                 currentLanguageMode = currentLanguageMode,
@@ -289,6 +193,325 @@ fun LivingSanctuaryScreen(
                 },
                 onDismiss = { showParentOverlay = false }
             )
+        }
+    }
+}
+
+/**
+ * Storybook Header with Title, Page Badge, and Discreet Parent Clasp.
+ */
+@Composable
+private fun StorybookHeader(
+    currentSpread: StorybookSpread,
+    totalPages: Int,
+    onParentGateUnlocked: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFEFE8D8))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = currentSpread.titleLukenye,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold,
+                color = Color(0xFF3E2723)
+            )
+            Text(
+                text = "${currentSpread.titleEnglish} • ${currentSpread.conceptDescription}",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Medium,
+                color = Color(0xFF6D4C41)
+            )
+        }
+
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            // Page Indicator Badge
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(12.dp))
+                    .background(Color(0xFFD2B48C).copy(alpha = 0.50f))
+                    .padding(horizontal = 10.dp, vertical = 6.dp)
+            ) {
+                Text(
+                    text = "Page ${currentSpread.pageIndex + 1} of $totalPages 📖",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF3E2723)
+                )
+            }
+
+            Spacer(modifier = Modifier.width(10.dp))
+
+            // Discreet Parent Clasp Lock
+            EmbersGateButton(
+                onGateUnlocked = onParentGateUnlocked
+            )
+        }
+    }
+}
+
+/**
+ * Full-Screen Illustrated Storybook Spread Page.
+ */
+@Composable
+private fun StorybookSpreadView(
+    spread: StorybookSpread,
+    currentLanguageMode: LanguageMode,
+    audioManager: AuthenticAudioManager,
+    onObjectTapped: (StorybookObject, RenderableLanguageContent) -> Unit
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "StorybookObjectBreathing")
+
+    // Gentle breathing scale animation for interactive targets (1.0f -> 1.04f over 2.5 seconds)
+    val breathingScale by infiniteTransition.animateFloat(
+        initialValue = 1.0f,
+        targetValue = 1.04f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2500),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "ObjectBreathing"
+    )
+
+    Box(modifier = Modifier.fillMaxSize()) {
+        // 1. Hand-Painted Illustrated Scene Backdrop
+        SanctuaryCanvas(
+            themeStyle = spread.themeStyle,
+            modifier = Modifier.fillMaxSize()
+        )
+
+        // 2. Interactive Objects positioned on canvas layout
+        spread.interactiveObjects.forEach { obj ->
+            val rawContent = remember(obj) {
+                LanguageContent(
+                    contentId = obj.id,
+                    englishText = obj.labelEnglish,
+                    lukenyeText = obj.labelLukenye,
+                    englishMeaning = obj.labelEnglish,
+                    lukenyeAudioAsset = obj.audioAssetPath,
+                    pronunciation = obj.pronunciation,
+                    verificationStatus = obj.verificationStatus
+                )
+            }
+
+            val renderable = remember(rawContent, currentLanguageMode) {
+                VerificationStateEnforcer.resolveRenderableContent(
+                    content = rawContent,
+                    preferLukenye = currentLanguageMode != LanguageMode.ENGLISH_PRIMARY,
+                    isDevMode = false
+                )
+            }
+
+            // Interactive Object Touch Target (Large touch target >= 72dp x 72dp)
+            Box(
+                modifier = Modifier.fillMaxSize()
+            ) {
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier
+                        .align(Alignment.TopStart)
+                        .offset(
+                            x = (obj.xPercent * 300).dp,
+                            y = (obj.yPercent * 400).dp
+                        )
+                        .scale(breathingScale)
+                        .clip(RoundedCornerShape(20.dp))
+                        .background(Color(0xFFFFFDF5).copy(alpha = 0.94f))
+                        .border(2.dp, Color(0xFF8D6E63), RoundedCornerShape(20.dp))
+                        .clickable {
+                            if (renderable.hasAudio && renderable.audioAssetPath != null) {
+                                audioManager.playPronunciation(renderable.audioAssetPath) {}
+                            }
+                            onObjectTapped(obj, renderable)
+                        }
+                        .padding(horizontal = 14.dp, vertical = 10.dp)
+                        .testTag("storybook_object_${obj.id}")
+                ) {
+                    Text(
+                        text = obj.illustrationEmoji,
+                        fontSize = 36.sp,
+                        textAlign = TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = renderable.primaryText,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF3E2723),
+                        textAlign = TextAlign.Center
+                    )
+                    Text(
+                        text = obj.labelEnglish,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = Color(0xFF6D4C41),
+                        textAlign = TextAlign.Center
+                    )
+                }
+            }
+        }
+    }
+}
+
+/**
+ * Storybook Footer with Page Swiping Controls & Dots.
+ */
+@OptIn(ExperimentalFoundationApi::class)
+@Composable
+private fun StorybookFooter(
+    pagerState: PagerState,
+    totalPages: Int,
+    onPrevClicked: () -> Unit,
+    onNextClicked: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .background(Color(0xFFEFE8D8))
+            .padding(horizontal = 16.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        // Previous Page Button
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (pagerState.currentPage > 0) Color(0xFFD2B48C) else Color(0xFFE0D8C8))
+                .clickable(enabled = pagerState.currentPage > 0) { onPrevClicked() }
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+                .testTag("prev_page_button")
+        ) {
+            Text(
+                text = "◄ Previous Page",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (pagerState.currentPage > 0) Color(0xFF3E2723) else Color(0xFF9E9E9E)
+            )
+        }
+
+        // Page Leaf Dot Indicators
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (i in 0 until totalPages) {
+                Box(
+                    modifier = Modifier
+                        .size(if (i == pagerState.currentPage) 10.dp else 8.dp)
+                        .clip(CircleShape)
+                        .background(if (i == pagerState.currentPage) Color(0xFF8D6E63) else Color(0xFFC8BCA8))
+                )
+            }
+        }
+
+        // Next Page Button
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(14.dp))
+                .background(if (pagerState.currentPage < totalPages - 1) Color(0xFFD2B48C) else Color(0xFFE0D8C8))
+                .clickable(enabled = pagerState.currentPage < totalPages - 1) { onNextClicked() }
+                .padding(horizontal = 14.dp, vertical = 8.dp)
+                .testTag("next_page_button")
+        ) {
+            Text(
+                text = "Next Page ►",
+                fontSize = 13.sp,
+                fontWeight = FontWeight.Bold,
+                color = if (pagerState.currentPage < totalPages - 1) Color(0xFF3E2723) else Color(0xFF9E9E9E)
+            )
+        }
+    }
+}
+
+/**
+ * Storybook Reading Card for Early Readers when an Object is tapped.
+ */
+@Composable
+private fun StorybookReadingCard(
+    storybookObject: StorybookObject,
+    renderable: RenderableLanguageContent,
+    audioManager: AuthenticAudioManager,
+    onDismiss: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .testTag("storybook_reading_card"),
+        shape = RoundedCornerShape(22.dp),
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF5)),
+        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFF8D6E63)),
+        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp, vertical = 16.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween
+        ) {
+            Text(
+                text = storybookObject.illustrationEmoji,
+                fontSize = 44.sp,
+                modifier = Modifier.padding(end = 16.dp)
+            )
+
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = renderable.primaryText,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF3E2723)
+                )
+                Text(
+                    text = "Pronunciation: \"${storybookObject.pronunciation}\"",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Medium,
+                    color = Color(0xFF8D6E63)
+                )
+                Spacer(modifier = Modifier.height(2.dp))
+                Text(
+                    text = "English: ${storybookObject.labelEnglish}",
+                    fontSize = 14.sp,
+                    fontWeight = FontWeight.Normal,
+                    color = Color(0xFF4E342E)
+                )
+            }
+
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                // Replay Audio Button
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFEFE8D8))
+                        .clickable {
+                            if (renderable.hasAudio && renderable.audioAssetPath != null) {
+                                audioManager.playPronunciation(renderable.audioAssetPath) {}
+                            }
+                        }
+                        .padding(8.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "🔊", fontSize = 20.sp)
+                }
+
+                Spacer(modifier = Modifier.width(12.dp))
+
+                // Dismiss Button
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFFD7CCC8))
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(text = "✕", fontSize = 16.sp, color = Color(0xFF3E2723), fontWeight = FontWeight.Bold)
+                }
+            }
         }
     }
 }

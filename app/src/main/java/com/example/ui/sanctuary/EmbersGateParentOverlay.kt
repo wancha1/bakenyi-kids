@@ -1,10 +1,5 @@
 package com.example.ui.sanctuary
 
-import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.animation.slideInVertically
-import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -14,7 +9,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -27,16 +21,14 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -72,11 +64,11 @@ fun EmbersGateButton(
     Box(
         modifier = modifier
             .testTag("embers_gate")
-            .size(54.dp)
+            .size(46.dp)
             .clip(CircleShape)
             .background(Color(0xFF3E2723).copy(alpha = 0.85f))
             .border(2.dp, Color(0xFFFFB703), CircleShape)
-            .shadow(6.dp, CircleShape)
+            .shadow(4.dp, CircleShape)
             .pointerInput(Unit) {
                 detectTapGestures(
                     onPress = {
@@ -103,12 +95,22 @@ fun EmbersGateButton(
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = if (isHolding) "🔥" else "🪵",
-                fontSize = 24.sp
+                fontSize = 20.sp
             )
         }
     }
 }
 
+/**
+ * Parent Area Modal (Embers Gate Protected)
+ * Contains only:
+ * • language mode
+ * • audio volume
+ * • screen time
+ * • accessibility
+ * • progress summary
+ * • privacy
+ */
 @Composable
 fun ParentSanctuaryOverlay(
     currentLanguageMode: LanguageMode,
@@ -116,34 +118,43 @@ fun ParentSanctuaryOverlay(
     onDismiss: () -> Unit
 ) {
     var sessionLimitMinutes by remember { mutableStateOf(20) }
+    var audioVolumeLevel by remember { mutableStateOf("BALANCED") }
+    var showWordLabels by remember { mutableStateOf(true) }
+    var highContrastMode by remember { mutableStateOf(false) }
 
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp)
+                .padding(12.dp)
                 .testTag("parent_sanctuary_overlay"),
-            shape = RoundedCornerShape(28.dp),
+            shape = RoundedCornerShape(26.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFFFAF8F5))
         ) {
             Column(
                 modifier = Modifier
-                    .padding(24.dp)
+                    .padding(20.dp)
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(imageVector = Icons.Default.Lock, contentDescription = "Parent Area", tint = Color(0xFF3E2723))
+                        Icon(
+                            imageVector = Icons.Default.Lock,
+                            contentDescription = "Parent Gate",
+                            tint = Color(0xFF3E2723),
+                            modifier = Modifier.size(20.dp)
+                        )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
-                            text = "PARENT SANCTUARY INSIGHTS",
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Black,
+                            text = "PARENT AREA",
+                            fontSize = 15.sp,
+                            fontWeight = FontWeight.Bold,
                             color = Color(0xFF3E2723)
                         )
                     }
@@ -153,25 +164,16 @@ fun ParentSanctuaryOverlay(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(16.dp))
+                Spacer(modifier = Modifier.height(14.dp))
 
-                // 1. Language Mode Selector
-                Text(
-                    text = "HERITAGE LANGUAGE MODE",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF5D4037),
-                    modifier = Modifier.align(Alignment.Start)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
+                // 1. LANGUAGE MODE
+                SectionHeader(title = "1. LANGUAGE MODE")
                 Column(
                     modifier = Modifier.fillMaxWidth(),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
                     val modes = listOf(
-                        Pair(LanguageMode.LUKENYE_PRIMARY, "Lukenye Primary (Audio + Oral Heritage Focus)"),
+                        Pair(LanguageMode.LUKENYE_PRIMARY, "Lukenye Primary (Authentic Oral Heritage Focus)"),
                         Pair(LanguageMode.ENGLISH_PRIMARY, "English Primary (Exploration with English Audio)"),
                         Pair(LanguageMode.DUAL_SIDE_BY_SIDE, "Dual Mode (Lukenye + English Side-by-Side)")
                     )
@@ -184,11 +186,11 @@ fun ParentSanctuaryOverlay(
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = if (isSelected) Color(0xFF2A9D8F) else Color(0xFFEFEBE9)
                             ),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(14.dp)
                         ) {
                             Text(
                                 text = title,
-                                fontSize = 12.sp,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isSelected) Color.White else Color(0xFF3E2723),
                                 textAlign = TextAlign.Start,
@@ -198,37 +200,28 @@ fun ParentSanctuaryOverlay(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // 2. Diurnal Session Time Limiter
-                Text(
-                    text = "DIURNAL SCREEN-TIME LIMITER",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF5D4037),
-                    modifier = Modifier.align(Alignment.Start)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
+                // 2. AUDIO VOLUME
+                SectionHeader(title = "2. AUDIO VOLUME")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    listOf(15, 20, 30, 45).forEach { mins ->
-                        val isSelected = sessionLimitMinutes == mins
+                    listOf("GENTLE" to "Gentle (50%)", "BALANCED" to "Balanced (80%)", "CLEAR" to "Clear (100%)").forEach { (level, title) ->
+                        val isSelected = audioVolumeLevel == level
                         Box(
                             modifier = Modifier
                                 .weight(1f)
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (isSelected) Color(0xFFE07A5F) else Color(0xFFEFEBE9))
-                                .clickable { sessionLimitMinutes = mins }
-                                .padding(vertical = 10.dp),
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) Color(0xFF2A9D8F) else Color(0xFFEFEBE9))
+                                .clickable { audioVolumeLevel = level }
+                                .padding(vertical = 8.dp),
                             contentAlignment = Alignment.Center
                         ) {
                             Text(
-                                text = "$mins min",
-                                fontSize = 12.sp,
+                                text = title,
+                                fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isSelected) Color.White else Color(0xFF3E2723)
                             )
@@ -236,55 +229,147 @@ fun ParentSanctuaryOverlay(
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
 
-                // 3. Qualitative Sanctuary Discovery Insights
-                Text(
-                    text = "QUALITATIVE DISCOVERY MEMORY",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Black,
-                    color = Color(0xFF5D4037),
-                    modifier = Modifier.align(Alignment.Start)
-                )
-
-                Spacer(modifier = Modifier.height(8.dp))
-
-                Card(
+                // 3. SCREEN TIME
+                SectionHeader(title = "3. SCREEN TIME LIMIT")
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color.White),
-                    shape = RoundedCornerShape(18.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE0E0E0))
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Column(modifier = Modifier.padding(16.dp)) {
+                    listOf(15, 20, 30, 45, 0).forEach { mins ->
+                        val isSelected = sessionLimitMinutes == mins
+                        val label = if (mins == 0) "Open" else "$mins m"
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) Color(0xFFE07A5F) else Color(0xFFEFEBE9))
+                                .clickable { sessionLimitMinutes = mins }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = label,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) Color.White else Color(0xFF3E2723)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 4. ACCESSIBILITY
+                SectionHeader(title = "4. ACCESSIBILITY")
+                Column(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = "🌿 Organic Child Encounters This Week:",
+                            text = "Show Written Word Labels",
                             fontSize = 12.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = Color(0xFF2E7D32)
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF3E2723)
                         )
-                        Spacer(modifier = Modifier.height(6.dp))
+                        Switch(
+                            checked = showWordLabels,
+                            onCheckedChange = { showWordLabels = it },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF2A9D8F))
+                        )
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
                         Text(
-                            text = "• Discovered Kigo the Otter near canoe landing & heard native greeting.\n• Watered sapling in meadow; plant bloomed overnight.\n• Listened to Grandmother JjaJja share the story of Crested Crane.",
+                            text = "High Contrast Visual Borders",
                             fontSize = 12.sp,
-                            color = Color(0xFF424242),
-                            lineHeight = 18.sp
+                            fontWeight = FontWeight.Medium,
+                            color = Color(0xFF3E2723)
+                        )
+                        Switch(
+                            checked = highContrastMode,
+                            onCheckedChange = { highContrastMode = it },
+                            colors = SwitchDefaults.colors(checkedThumbColor = Color(0xFF2A9D8F))
                         )
                     }
                 }
 
-                Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 5. PROGRESS SUMMARY
+                SectionHeader(title = "5. PROGRESS SUMMARY")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                    shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFE0E0E0))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "🌿 Calm Picture Book Engagement:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF2E7D32)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "• Explored Riverbank Greetings, Family Hearth, Wetland Wildlife, Nature, Numbers 1–5, Colours & Canoe Songs.\n• 100% human-recorded Lukenye pronunciation listened to.\n• Zero competitive pressure, no quizzes, no graded tests.",
+                            fontSize = 11.sp,
+                            color = Color(0xFF424242),
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 6. PRIVACY
+                SectionHeader(title = "6. PRIVACY & SAFETY")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                    shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFC8E6C9))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "🔒 Child Safety & Privacy Commitment:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1B5E20)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "• 100% Offline-first: No user data leaves this device.\n• Zero advertisements, trackers, logins, or social features.\n• Fully compliant with global children's privacy standards (COPPA).",
+                            fontSize = 11.sp,
+                            color = Color(0xFF2E7D32),
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(18.dp))
 
                 Button(
                     onClick = onDismiss,
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(48.dp),
+                        .height(46.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF3E2723)),
-                    shape = RoundedCornerShape(16.dp)
+                    shape = RoundedCornerShape(14.dp)
                 ) {
                     Text(
-                        text = "RETURN TO SANCTUARY",
-                        fontSize = 13.sp,
+                        text = "RETURN TO PICTURE BOOK",
+                        fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White
                     )
@@ -292,4 +377,17 @@ fun ParentSanctuaryOverlay(
             }
         }
     }
+}
+
+@Composable
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        fontSize = 11.sp,
+        fontWeight = FontWeight.Black,
+        color = Color(0xFF5D4037),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 6.dp)
+    )
 }

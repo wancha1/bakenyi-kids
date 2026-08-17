@@ -5,14 +5,12 @@ import android.media.AudioAttributes
 import android.media.AudioManager
 import android.media.MediaPlayer
 import android.media.SoundPool
-import android.media.ToneGenerator
 import android.util.Log
 
 class AuthenticAudioManager private constructor(private val context: Context) {
 
     private var mediaPlayer: MediaPlayer? = null
     private var soundPool: SoundPool? = null
-    private var toneGenerator: ToneGenerator? = null
 
     init {
         try {
@@ -26,11 +24,9 @@ class AuthenticAudioManager private constructor(private val context: Context) {
                 .setAudioAttributes(audioAttributes)
                 .build()
 
-            toneGenerator = ToneGenerator(AudioManager.STREAM_MUSIC, 100)
-
             Log.d("AUDIO_DEBUG", "AuthenticAudioManager initialized successfully")
         } catch (e: Exception) {
-            Log.e("AUDIO_DEBUG", "Error initializing SoundPool or ToneGenerator", e)
+            Log.e("AUDIO_DEBUG", "Error initializing SoundPool", e)
             Log.e("BAKENYE_CRASH", "Audio initialization error caught safely", e)
         }
     }
@@ -77,18 +73,8 @@ class AuthenticAudioManager private constructor(private val context: Context) {
             val resId = context.resources.getIdentifier("snd_success", "raw", context.packageName)
             if (resId != 0) {
                 playPronunciation("snd_success")
-            } else {
-                // Synthesize energetic double-chime success sound
-                Thread {
-                    try {
-                        toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP, 120)
-                        Thread.sleep(110)
-                        toneGenerator?.startTone(ToneGenerator.TONE_PROP_BEEP2, 180)
-                    } catch (e: Exception) {
-                        Log.e("AUDIO_DEBUG", "Tone playback error", e)
-                    }
-                }.start()
             }
+            // If asset does not exist, silently omit synthetic beeps to respect natural audio philosophy
         } catch (e: Exception) {
             Log.e("AUDIO_DEBUG", "Exception during success sound playback", e)
         }
@@ -100,16 +86,8 @@ class AuthenticAudioManager private constructor(private val context: Context) {
             val resId = context.resources.getIdentifier("snd_failure", "raw", context.packageName)
             if (resId != 0) {
                 playPronunciation("snd_failure")
-            } else {
-                // Synthesize low failure buzz sound
-                Thread {
-                    try {
-                        toneGenerator?.startTone(ToneGenerator.TONE_PROP_NACK, 250)
-                    } catch (e: Exception) {
-                        Log.e("AUDIO_DEBUG", "Tone playback error", e)
-                    }
-                }.start()
             }
+            // If asset does not exist, silently omit. No harsh error/wrong answer sounds exist in Sanctuary.
         } catch (e: Exception) {
             Log.e("AUDIO_DEBUG", "Exception during failure sound playback", e)
         }
@@ -122,8 +100,6 @@ class AuthenticAudioManager private constructor(private val context: Context) {
             mediaPlayer = null
             soundPool?.release()
             soundPool = null
-            toneGenerator?.release()
-            toneGenerator = null
             Log.d("AUDIO_DEBUG", "AuthenticAudioManager released resources")
         } catch (e: Exception) {
             Log.e("AUDIO_DEBUG", "Error releasing AuthenticAudioManager", e)

@@ -11,6 +11,7 @@ import com.example.data.model.ChildLessonProgressEntity
 import com.example.data.model.Lesson
 import com.example.data.model.LocationProgressEntity
 import com.example.data.model.Phrase
+import com.example.data.model.SanctuaryStateEntity
 import com.example.data.model.UserProfile
 import com.example.data.model.VocabularyEntity
 import com.example.data.model.World
@@ -132,4 +133,14 @@ interface BakenyeDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveLocationProgress(progress: LocationProgressEntity)
+
+    // Sanctuary State Persistence
+    @Query("SELECT * FROM sanctuary_state WHERE id = :id LIMIT 1")
+    fun getSanctuaryState(id: String = "PRIMARY_SANCTUARY"): Flow<SanctuaryStateEntity?>
+
+    @Query("SELECT * FROM sanctuary_state WHERE id = :id LIMIT 1")
+    suspend fun getSanctuaryStateOnce(id: String = "PRIMARY_SANCTUARY"): SanctuaryStateEntity?
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun saveSanctuaryState(state: SanctuaryStateEntity)
 }

@@ -7,12 +7,9 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
@@ -21,263 +18,331 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.input.pointer.pointerInput
-import kotlin.math.cos
 import kotlin.math.sin
-
-data class WaterRipple(
-    val x: Float,
-    val y: Float,
-    var radius: Float = 10f,
-    var alpha: Float = 0.8f,
-    val maxRadius: Float = 120f
-)
-
-data class FireflyParticle(
-    val initialXRatio: Float,
-    val initialYRatio: Float,
-    val speed: Float,
-    val phase: Float
-)
 
 @Composable
 fun SanctuaryCanvas(
-    timeOfDay: DiurnalTimeOfDay,
-    activeBiome: SanctuaryBiome,
-    modifier: Modifier = Modifier,
-    onWaterTap: (Offset) -> Unit = {}
+    themeStyle: StorybookThemeStyle,
+    modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "SanctuaryEcosystemAnimation")
+    val infiniteTransition = rememberInfiniteTransition(label = "StorybookCalmAnimation")
 
-    val wavePhase by infiniteTransition.animateFloat(
+    // Subtle, calming water shimmer movement (4.5-second duration)
+    val waterShimmerPhase by infiniteTransition.animateFloat(
         initialValue = 0f,
         targetValue = 6.28318f,
         animationSpec = infiniteRepeatable(
-            animation = tween(4000),
+            animation = tween(4500),
             repeatMode = RepeatMode.Restart
         ),
-        label = "WavePhase"
+        label = "WaterShimmer"
     )
 
-    val reedSway by infiniteTransition.animateFloat(
-        initialValue = -12f,
-        targetValue = 12f,
+    // Gentle leaf sway / breeze movement (3.5-second reverse loop)
+    val leafSway by infiniteTransition.animateFloat(
+        initialValue = -8f,
+        targetValue = 8f,
         animationSpec = infiniteRepeatable(
             animation = tween(3500),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "ReedSway"
+        label = "LeafSway"
     )
 
-    val fireflyPulse by infiniteTransition.animateFloat(
-        initialValue = 0.2f,
-        targetValue = 0.95f,
+    // Subtle drifting smoke / cloud movement
+    val driftOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 20f,
         animationSpec = infiniteRepeatable(
-            animation = tween(2000),
+            animation = tween(5000),
             repeatMode = RepeatMode.Reverse
         ),
-        label = "FireflyPulse"
+        label = "DriftOffset"
     )
 
-    val ripples = remember { mutableStateListOf<WaterRipple>() }
-
-    val fireflies = remember {
-        List(18) { index ->
-            FireflyParticle(
-                initialXRatio = (index * 0.055f + 0.08f) % 0.95f,
-                initialYRatio = 0.40f + (index * 0.035f % 0.45f),
-                speed = 0.5f + (index % 3) * 0.3f,
-                phase = index * 0.5f
-            )
-        }
-    }
-
-    Canvas(
-        modifier = modifier
-            .fillMaxSize()
-            .pointerInput(Unit) {
-                detectTapGestures { offset ->
-                    ripples.add(WaterRipple(offset.x, offset.y))
-                    if (ripples.size > 12) {
-                        ripples.removeAt(0)
-                    }
-                    onWaterTap(offset)
-                }
-            }
-    ) {
+    Canvas(modifier = modifier.fillMaxSize()) {
         val width = size.width
         val height = size.height
 
         if (width <= 0f || height <= 0f) return@Canvas
 
         try {
-            // 1. Sky & Atmospheric Lighting
-            drawAtmosphereSky(width, height, timeOfDay)
-
-            // 2. Horizon Biome Background Elements
-            when (activeBiome) {
-                SanctuaryBiome.HILLS_AND_MEADOWS -> drawHillsAndMeadows(width, height, reedSway)
-                SanctuaryBiome.BAOBAB_FOREST -> drawBaobabGrove(width, height, reedSway)
-                SanctuaryBiome.VILLAGE_LANDING -> drawVillageCanoeLanding(width, height, wavePhase)
-                SanctuaryBiome.RIVER_WETLANDS -> drawWetlandsAndRiver(width, height, wavePhase, reedSway)
-            }
-
-            // 3. Dynamic Water Surface
-            drawWaterSurface(width, height, wavePhase, timeOfDay)
-
-            // 4. Interactive Water Displacement Ripples
-            val iterator = ripples.iterator()
-            while (iterator.hasNext()) {
-                val ripple = iterator.next()
-                ripple.radius += 3.5f
-                ripple.alpha -= 0.022f
-
-                if (ripple.alpha <= 0f || ripple.radius >= ripple.maxRadius) {
-                    iterator.remove()
-                } else {
-                    drawCircle(
-                        color = Color.White.copy(alpha = ripple.alpha.coerceIn(0f, 1f)),
-                        radius = ripple.radius,
-                        center = Offset(ripple.x, ripple.y),
-                        style = androidx.compose.ui.graphics.drawscope.Stroke(width = 3f)
-                    )
+            when (themeStyle) {
+                StorybookThemeStyle.RIVERBANK_DAWN -> {
+                    drawRiverbankDawn(width, height, waterShimmerPhase, leafSway)
+                }
+                StorybookThemeStyle.VILLAGE_HEARTH -> {
+                    drawVillageHearth(width, height, driftOffset)
+                }
+                StorybookThemeStyle.WETLAND_MARSH -> {
+                    drawWetlandMarsh(width, height, waterShimmerPhase, leafSway)
+                }
+                StorybookThemeStyle.BAOBAB_CANOPY -> {
+                    drawBaobabCanopy(width, height, leafSway)
+                }
+                StorybookThemeStyle.LAKESIDE_COUNTING -> {
+                    drawLakesideCounting(width, height, waterShimmerPhase)
+                }
+                StorybookThemeStyle.LAKESIDE_COLOURS -> {
+                    drawLakesideColours(width, height, waterShimmerPhase)
+                }
+                StorybookThemeStyle.FISHERMAN_SONG -> {
+                    drawFishermanSong(width, height, waterShimmerPhase, driftOffset)
                 }
             }
-
-            // 5. Fireflies at Evening/Twilight
-            if (timeOfDay == DiurnalTimeOfDay.EVENING_GOLD || timeOfDay == DiurnalTimeOfDay.TWILIGHT_DUSK) {
-                fireflies.forEach { firefly ->
-                    val x = (firefly.initialXRatio * width) + (sin(wavePhase * firefly.speed + firefly.phase) * 25f)
-                    val y = (firefly.initialYRatio * height) + (cos(wavePhase * firefly.speed + firefly.phase) * 15f)
-                    val alpha = (fireflyPulse * sin(wavePhase + firefly.phase)).coerceIn(0.1f, 0.9f)
-
-                    drawCircle(
-                        color = Color(0xFFFFB703).copy(alpha = alpha),
-                        radius = 6f,
-                        center = Offset(x, y)
-                    )
-                    drawCircle(
-                        color = Color(0xFFFFF3C4).copy(alpha = alpha * 0.5f),
-                        radius = 12f,
-                        center = Offset(x, y)
-                    )
-                }
-            }
-
         } catch (e: Exception) {
-            Log.e("SANCTUARY_CANVAS", "Error rendering SanctuaryCanvas frame", e)
+            Log.e("STORYBOOK_CANVAS", "Error rendering Storybook canvas", e)
         }
     }
 }
 
-private fun DrawScope.drawAtmosphereSky(width: Float, height: Float, timeOfDay: DiurnalTimeOfDay) {
-    val skyColors = when (timeOfDay) {
-        DiurnalTimeOfDay.MORNING_DAWN -> listOf(Color(0xFFFFF3E0), Color(0xFFE0F7FA), Color(0xFFB2EBF2))
-        DiurnalTimeOfDay.MIDDAY_SUN -> listOf(Color(0xFFE0F2FE), Color(0xFFBAE6FD), Color(0xFF38BDF8))
-        DiurnalTimeOfDay.EVENING_GOLD -> listOf(Color(0xFFFFE0B2), Color(0xFFFFB74D), Color(0xFFF57C00))
-        DiurnalTimeOfDay.TWILIGHT_DUSK -> listOf(Color(0xFF1E1B4B), Color(0xFF312E81), Color(0xFF1E293B))
-    }
-
+/**
+ * Spread 1: Riverbank Dawn Illustration Backdrop
+ */
+private fun DrawScope.drawRiverbankDawn(width: Float, height: Float, waterPhase: Float, sway: Float) {
+    // 1. Soft Morning Sky
     val skyGradient = Brush.verticalGradient(
-        colors = skyColors,
+        colors = listOf(Color(0xFFFFF3E0), Color(0xFFE0F7FA), Color(0xFFB2EBF2)),
         startY = 0f,
-        endY = height * 0.60f
+        endY = height * 0.55f
     )
-    drawRect(brush = skyGradient, size = Size(width, height * 0.60f))
-}
+    drawRect(brush = skyGradient, size = Size(width, height * 0.55f))
 
-private fun DrawScope.drawHillsAndMeadows(width: Float, height: Float, sway: Float) {
-    val hillPath = Path().apply {
-        moveTo(0f, height * 0.40f)
-        quadraticTo(width * 0.25f, height * 0.30f, width * 0.50f, height * 0.38f)
-        quadraticTo(width * 0.75f, height * 0.45f, width, height * 0.35f)
-        lineTo(width, height * 0.65f)
-        lineTo(0f, height * 0.65f)
+    // 2. Shoreline Grass Bank
+    val bankPath = Path().apply {
+        moveTo(0f, height * 0.45f)
+        quadraticTo(width * 0.30f, height * 0.40f, width * 0.60f, height * 0.48f)
+        quadraticTo(width * 0.85f, height * 0.52f, width, height * 0.42f)
+        lineTo(width, height * 0.60f)
+        lineTo(0f, height * 0.60f)
         close()
     }
-    drawPath(path = hillPath, brush = Brush.verticalGradient(listOf(Color(0xFF689F38), Color(0xFF33691E))))
-}
+    drawPath(path = bankPath, brush = Brush.verticalGradient(listOf(Color(0xFF81C784), Color(0xFF388E3C))))
 
-private fun DrawScope.drawBaobabGrove(width: Float, height: Float, sway: Float) {
-    // Baobab Trunk
-    val trunkPath = Path().apply {
-        moveTo(width * 0.15f, height * 0.60f)
-        quadraticTo(width * 0.25f, height * 0.35f, width * 0.22f, height * 0.15f)
-        lineTo(width * 0.35f, height * 0.15f)
-        quadraticTo(width * 0.32f, height * 0.35f, width * 0.42f, height * 0.60f)
-        close()
-    }
-    drawPath(path = trunkPath, brush = Brush.horizontalGradient(listOf(Color(0xFF4E342E), Color(0xFF6D4C41), Color(0xFF3E2723))))
-
-    // Baobab Canopy Leaves
-    drawCircle(color = Color(0xFF2E7D32), radius = width * 0.18f, center = Offset(width * 0.28f + sway * 0.3f, height * 0.18f))
-    drawCircle(color = Color(0xFF388E3C), radius = width * 0.14f, center = Offset(width * 0.18f + sway * 0.2f, height * 0.22f))
-}
-
-private fun DrawScope.drawVillageCanoeLanding(width: Float, height: Float, wavePhase: Float) {
-    // Homestead Clay Hut Outline
-    val hutCenterX = width * 0.78f
-    val hutBaseY = height * 0.48f
-
-    // Roof
-    val roofPath = Path().apply {
-        moveTo(hutCenterX - 80f, hutBaseY)
-        lineTo(hutCenterX, hutBaseY - 70f)
-        lineTo(hutCenterX + 80f, hutBaseY)
-        close()
-    }
-    drawPath(path = roofPath, color = Color(0xFF8D6E63))
-
-    // Wall
-    drawRoundRect(
-        color = Color(0xFFD7CCC8),
-        topLeft = Offset(hutCenterX - 65f, hutBaseY),
-        size = Size(130f, 60f),
-        cornerRadius = CornerRadius(8f, 8f)
+    // 3. Calm River Water Surface
+    val waterTop = height * 0.55f
+    val waterGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFF4FC3F7), Color(0xFF0288D1), Color(0xFF01579B)),
+        startY = waterTop,
+        endY = height
     )
-}
-
-private fun DrawScope.drawWetlandsAndRiver(width: Float, height: Float, wavePhase: Float, sway: Float) {
-    // Papyrus Reeds along river edge
-    val reedColor = Color(0xFF2E7D32)
-    val reedWidth = width * 0.012f
-    for (i in 0..22) {
-        val reedX = (i / 22f) * width
-        val reedHeight = (height * 0.12f) + (sin(i.toDouble()) * 14f).toFloat()
-        val swayX = (sin((i + sway * 0.1f).toDouble()) * 10f).toFloat()
-
-        drawLine(
-            color = reedColor,
-            start = Offset(reedX, height * 0.52f),
-            end = Offset(reedX + swayX, height * 0.52f - reedHeight),
-            strokeWidth = reedWidth
-        )
-    }
-}
-
-private fun DrawScope.drawWaterSurface(width: Float, height: Float, wavePhase: Float, timeOfDay: DiurnalTimeOfDay) {
-    val waterTop = height * 0.52f
-    val waterColors = when (timeOfDay) {
-        DiurnalTimeOfDay.MORNING_DAWN -> listOf(Color(0xFF00ACC1), Color(0xFF00838F), Color(0xFF006064))
-        DiurnalTimeOfDay.MIDDAY_SUN -> listOf(Color(0xFF0284C7), Color(0xFF0369A1), Color(0xFF075985))
-        DiurnalTimeOfDay.EVENING_GOLD -> listOf(Color(0xFFD97706), Color(0xFFB45309), Color(0xFF78350F))
-        DiurnalTimeOfDay.TWILIGHT_DUSK -> listOf(Color(0xFF0F172A), Color(0xFF1E293B), Color(0xFF0284C7))
-    }
-
-    val waterGradient = Brush.verticalGradient(colors = waterColors, startY = waterTop, endY = height)
 
     val waterPath = Path().apply {
         moveTo(0f, waterTop)
-        val steps = 24
+        val steps = 16
         for (i in 0..steps) {
             val x = (i / steps.toFloat()) * width
-            val y = waterTop + (sin((i * 0.5f) + wavePhase) * 10f).toFloat()
+            val y = waterTop + (sin((i * 0.5f) + waterPhase) * 6f).toFloat()
             lineTo(x, y)
         }
         lineTo(width, height)
         lineTo(0f, height)
         close()
     }
-
     drawPath(path = waterPath, brush = waterGradient)
+
+    // 4. Papyrus Reeds Silhouette
+    for (i in 0..12) {
+        val reedX = (i / 12f) * width * 0.45f + 10f
+        val reedHeight = height * 0.12f + (sin(i.toDouble()) * 10f).toFloat()
+        drawLine(
+            color = Color(0xFF2E7D32),
+            start = Offset(reedX, waterTop),
+            end = Offset(reedX + sway * 0.5f, waterTop - reedHeight),
+            strokeWidth = 5f
+        )
+    }
+}
+
+/**
+ * Spread 2: Village Hearth Illustration Backdrop
+ */
+private fun DrawScope.drawVillageHearth(width: Float, height: Float, drift: Float) {
+    // 1. Warm Earthy Wall Background
+    val wallGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFFF5E6CA), Color(0xFFE6CFA8), Color(0xFFD4B886)),
+        startY = 0f,
+        endY = height
+    )
+    drawRect(brush = wallGradient, size = Size(width, height))
+
+    // 2. Thatched Clay Hut Outline
+    val hutCenterX = width * 0.72f
+    val hutBaseY = height * 0.42f
+
+    val roofPath = Path().apply {
+        moveTo(hutCenterX - 110f, hutBaseY)
+        lineTo(hutCenterX, hutBaseY - 90f)
+        lineTo(hutCenterX + 110f, hutBaseY)
+        close()
+    }
+    drawPath(path = roofPath, color = Color(0xFF8D6E63))
+
+    drawRoundRect(
+        color = Color(0xFFBCAAA4),
+        topLeft = Offset(hutCenterX - 85f, hutBaseY),
+        size = Size(170f, 100f),
+        cornerRadius = CornerRadius(12f, 12f)
+    )
+
+    // 3. Hearth Smoke Drift
+    drawCircle(
+        color = Color(0x33BDBDBD),
+        radius = 16f,
+        center = Offset(width * 0.48f + drift * 0.3f, height * 0.55f - drift * 0.5f)
+    )
+    drawCircle(
+        color = Color(0x229E9E9E),
+        radius = 24f,
+        center = Offset(width * 0.50f + drift * 0.5f, height * 0.50f - drift * 0.8f)
+    )
+
+    // 4. Woven Grass Mat Floor
+    val matPath = Path().apply {
+        moveTo(width * 0.10f, height * 0.70f)
+        lineTo(width * 0.90f, height * 0.70f)
+        lineTo(width * 0.95f, height)
+        lineTo(width * 0.05f, height)
+        close()
+    }
+    drawPath(path = matPath, color = Color(0xFFE0C397))
+}
+
+/**
+ * Spread 3: Wetland Marsh Illustration Backdrop
+ */
+private fun DrawScope.drawWetlandMarsh(width: Float, height: Float, waterPhase: Float, sway: Float) {
+    // 1. Soft Marsh Sky
+    val skyGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFFE8F5E9), Color(0xFFC8E6C9), Color(0xFFA5D6A7)),
+        startY = 0f,
+        endY = height * 0.50f
+    )
+    drawRect(brush = skyGradient, size = Size(width, height * 0.50f))
+
+    // 2. Marsh Water Surface
+    val waterTop = height * 0.48f
+    val waterGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFF4DB6AC), Color(0xFF00897B), Color(0xFF004D40)),
+        startY = waterTop,
+        endY = height
+    )
+    drawRect(brush = waterGradient, topLeft = Offset(0f, waterTop), size = Size(width, height - waterTop))
+
+    // 3. Floating Water Lily Pads
+    val lilyColors = Color(0xFF2E7D32)
+    drawCircle(color = lilyColors, radius = width * 0.08f, center = Offset(width * 0.30f, height * 0.75f))
+    drawCircle(color = lilyColors, radius = width * 0.06f, center = Offset(width * 0.70f, height * 0.80f))
+}
+
+/**
+ * Spread 4: Baobab Canopy Illustration Backdrop
+ */
+private fun DrawScope.drawBaobabCanopy(width: Float, height: Float, sway: Float) {
+    // 1. Warm Forest Canopy Sky
+    val skyGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFFFFF8E1), Color(0xFFFFECB3), Color(0xFFFFD54F)),
+        startY = 0f,
+        endY = height
+    )
+    drawRect(brush = skyGradient, size = Size(width, height))
+
+    // 2. Grand Baobab Tree Trunk
+    val trunkPath = Path().apply {
+        moveTo(width * 0.20f, height)
+        quadraticTo(width * 0.28f, height * 0.55f, width * 0.24f, height * 0.20f)
+        lineTo(width * 0.42f, height * 0.20f)
+        quadraticTo(width * 0.38f, height * 0.55f, width * 0.46f, height)
+        close()
+    }
+    drawPath(path = trunkPath, brush = Brush.horizontalGradient(listOf(Color(0xFF4E342E), Color(0xFF6D4C41), Color(0xFF3E2723))))
+
+    // 3. Leaf Canopy
+    drawCircle(color = Color(0xFF33691E), radius = width * 0.22f, center = Offset(width * 0.33f + sway * 0.4f, height * 0.18f))
+    drawCircle(color = Color(0xFF558B2F), radius = width * 0.18f, center = Offset(width * 0.20f + sway * 0.2f, height * 0.24f))
+}
+
+/**
+ * Spread 5: Lakeside Counting Illustration Backdrop
+ */
+private fun DrawScope.drawLakesideCounting(width: Float, height: Float, waterPhase: Float) {
+    // 1. Calm Sandy Shore Background
+    val sandGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFFFFF8E1), Color(0xFFFFECB3), Color(0xFFFFD54F)),
+        startY = 0f,
+        endY = height * 0.60f
+    )
+    drawRect(brush = sandGradient, size = Size(width, height * 0.60f))
+
+    // 2. Lake Edge
+    val waterTop = height * 0.60f
+    val waterGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFF29B6F6), Color(0xFF0288D1), Color(0xFF01579B)),
+        startY = waterTop,
+        endY = height
+    )
+    drawRect(brush = waterGradient, topLeft = Offset(0f, waterTop), size = Size(width, height - waterTop))
+}
+
+/**
+ * Spread 6: Lakeside Colours Backdrop
+ */
+private fun DrawScope.drawLakesideColours(width: Float, height: Float, waterPhase: Float) {
+    // 1. Sunset Rainbow / Lake Sky Gradient
+    val rainbowGradient = Brush.verticalGradient(
+        colors = listOf(
+            Color(0xFFFFCC80), // Warm Sunrise Ochre
+            Color(0xFFFFAB91), // Sunset Rose
+            Color(0xFFCE93D8), // Twilight Violet
+            Color(0xFF81D4FA)  // Shoreline Blue
+        ),
+        startY = 0f,
+        endY = height
+    )
+    drawRect(brush = rainbowGradient, size = Size(width, height))
+
+    // Gentle sun halo
+    drawCircle(
+        brush = Brush.radialGradient(
+            listOf(Color(0x88FFE082), Color(0x00FFE082)),
+            center = Offset(width * 0.5f, height * 0.25f),
+            radius = width * 0.35f
+        ),
+        radius = width * 0.35f,
+        center = Offset(width * 0.5f, height * 0.25f)
+    )
+}
+
+/**
+ * Spread 7: Fisherman Song & Story Backdrop
+ */
+private fun DrawScope.drawFishermanSong(width: Float, height: Float, waterPhase: Float, drift: Float) {
+    // 1. Twilight Evening Sky
+    val nightGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFF1A237E), Color(0xFF283593), Color(0xFF3949AB), Color(0xFF004D40)),
+        startY = 0f,
+        endY = height
+    )
+    drawRect(brush = nightGradient, size = Size(width, height))
+
+    // 2. Crescent Moon Glow
+    drawCircle(
+        color = Color(0xFFFFEE58),
+        radius = width * 0.07f,
+        center = Offset(width * 0.82f, height * 0.14f)
+    )
+    drawCircle(
+        color = Color(0xFF1A237E),
+        radius = width * 0.06f,
+        center = Offset(width * 0.80f, height * 0.12f)
+    )
+
+    // 3. Gentle Lake Water with Moon Reflection
+    val waterTop = height * 0.58f
+    val lakeGradient = Brush.verticalGradient(
+        colors = listOf(Color(0xFF004D40), Color(0xFF00695C), Color(0xFF004D40)),
+        startY = waterTop,
+        endY = height
+    )
+    drawRect(brush = lakeGradient, topLeft = Offset(0f, waterTop), size = Size(width, height - waterTop))
 }
