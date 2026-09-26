@@ -27,6 +27,7 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -52,6 +53,9 @@ import com.example.language.context.LanguageMode
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
+/**
+ * 3-Second Hold / PIN Parent Gate Button.
+ */
 @Composable
 fun EmbersGateButton(
     onGateUnlocked: () -> Unit,
@@ -66,7 +70,7 @@ fun EmbersGateButton(
             .testTag("embers_gate")
             .size(46.dp)
             .clip(CircleShape)
-            .background(Color(0xFF3E2723).copy(alpha = 0.85f))
+            .background(Color(0xFF3E2723).copy(alpha = 0.88f))
             .border(2.dp, Color(0xFFFFB703), CircleShape)
             .shadow(4.dp, CircleShape)
             .pointerInput(Unit) {
@@ -102,14 +106,15 @@ fun EmbersGateButton(
 }
 
 /**
- * Parent Area Modal (Embers Gate Protected)
- * Contains only:
- * • language mode
- * • audio volume
- * • screen time
- * • accessibility
- * • progress summary
- * • privacy
+ * Parent Area Modal (Embers Gate Protected).
+ * Contains ONLY:
+ * • Language mode
+ * • Screen time
+ * • Audio settings
+ * • Accessibility
+ * • Privacy
+ * • Progress summary
+ * • About
  */
 @Composable
 fun ParentSanctuaryOverlay(
@@ -126,14 +131,14 @@ fun ParentSanctuaryOverlay(
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(12.dp)
+                .padding(10.dp)
                 .testTag("parent_sanctuary_overlay"),
             shape = RoundedCornerShape(26.dp),
             colors = CardDefaults.cardColors(containerColor = Color(0xFFFAF8F5))
         ) {
             Column(
                 modifier = Modifier
-                    .padding(20.dp)
+                    .padding(18.dp)
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
@@ -202,37 +207,8 @@ fun ParentSanctuaryOverlay(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 2. AUDIO VOLUME
-                SectionHeader(title = "2. AUDIO VOLUME")
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    listOf("GENTLE" to "Gentle (50%)", "BALANCED" to "Balanced (80%)", "CLEAR" to "Clear (100%)").forEach { (level, title) ->
-                        val isSelected = audioVolumeLevel == level
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .clip(RoundedCornerShape(12.dp))
-                                .background(if (isSelected) Color(0xFF2A9D8F) else Color(0xFFEFEBE9))
-                                .clickable { audioVolumeLevel = level }
-                                .padding(vertical = 8.dp),
-                            contentAlignment = Alignment.Center
-                        ) {
-                            Text(
-                                text = title,
-                                fontSize = 11.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = if (isSelected) Color.White else Color(0xFF3E2723)
-                            )
-                        }
-                    }
-                }
-
-                Spacer(modifier = Modifier.height(16.dp))
-
-                // 3. SCREEN TIME
-                SectionHeader(title = "3. SCREEN TIME LIMIT")
+                // 2. SCREEN TIME LIMIT
+                SectionHeader(title = "2. SCREEN TIME LIMIT")
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(6.dp)
@@ -251,6 +227,35 @@ fun ParentSanctuaryOverlay(
                         ) {
                             Text(
                                 text = label,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = if (isSelected) Color.White else Color(0xFF3E2723)
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 3. AUDIO SETTINGS
+                SectionHeader(title = "3. AUDIO SETTINGS")
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    listOf("GENTLE" to "Gentle (50%)", "BALANCED" to "Balanced (80%)", "CLEAR" to "Clear (100%)").forEach { (level, title) ->
+                        val isSelected = audioVolumeLevel == level
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .clip(RoundedCornerShape(12.dp))
+                                .background(if (isSelected) Color(0xFF2A9D8F) else Color(0xFFEFEBE9))
+                                .clickable { audioVolumeLevel = level }
+                                .padding(vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = title,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
                                 color = if (isSelected) Color.White else Color(0xFF3E2723)
@@ -305,8 +310,35 @@ fun ParentSanctuaryOverlay(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 5. PROGRESS SUMMARY
-                SectionHeader(title = "5. PROGRESS SUMMARY")
+                // 5. PRIVACY & SAFETY
+                SectionHeader(title = "5. PRIVACY & SAFETY")
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                    shape = RoundedCornerShape(14.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFC8E6C9))
+                ) {
+                    Column(modifier = Modifier.padding(14.dp)) {
+                        Text(
+                            text = "🔒 Child Safety Commitment:",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = Color(0xFF1B5E20)
+                        )
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(
+                            text = "• 100% Offline-first: No user data leaves this device.\n• Zero advertisements, trackers, logins, or social features.\n• Compliant with global children's privacy standards (COPPA).",
+                            fontSize = 11.sp,
+                            color = Color(0xFF2E7D32),
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // 6. PROGRESS SUMMARY (Qualitative Only)
+                SectionHeader(title = "6. PROGRESS SUMMARY")
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     colors = CardDefaults.cardColors(containerColor = Color.White),
@@ -315,14 +347,14 @@ fun ParentSanctuaryOverlay(
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Text(
-                            text = "🌿 Calm Picture Book Engagement:",
+                            text = "🌿 Qualitative Storybook Activity:",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
                             color = Color(0xFF2E7D32)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "• Explored Riverbank Greetings, Family Hearth, Wetland Wildlife, Nature, Numbers 1–5, Colours & Canoe Songs.\n• 100% human-recorded Lukenye pronunciation listened to.\n• Zero competitive pressure, no quizzes, no graded tests.",
+                            text = "• Explored 18 Picture Books (Greetings, Family, Home, Village, Animals, Nature, Numbers, Songs, Daily Life).\n• Listened to authentic human-recorded Lukenye speech.\n• Zero competitive pressure, no quizzes, no graded tests.",
                             fontSize = 11.sp,
                             color = Color(0xFF424242),
                             lineHeight = 16.sp
@@ -332,26 +364,26 @@ fun ParentSanctuaryOverlay(
 
                 Spacer(modifier = Modifier.height(16.dp))
 
-                // 6. PRIVACY
-                SectionHeader(title = "6. PRIVACY & SAFETY")
+                // 7. ABOUT & CULTURAL HERITAGE
+                SectionHeader(title = "7. ABOUT BAKENYI KIDS")
                 Card(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                    colors = CardDefaults.cardColors(containerColor = Color(0xFFFFF8E1)),
                     shape = RoundedCornerShape(14.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFC8E6C9))
+                    border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFECB3))
                 ) {
                     Column(modifier = Modifier.padding(14.dp)) {
                         Text(
-                            text = "🔒 Child Safety & Privacy Commitment:",
+                            text = "📖 Bakenyi Kids v1.0 Launch Edition",
                             fontSize = 12.sp,
                             fontWeight = FontWeight.Bold,
-                            color = Color(0xFF1B5E20)
+                            color = Color(0xFF5D4037)
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = "• 100% Offline-first: No user data leaves this device.\n• Zero advertisements, trackers, logins, or social features.\n• Fully compliant with global children's privacy standards (COPPA).",
+                            text = "Preserving and teaching the endangered Lukenye language and rich cultural heritage of the Bakenyi people of Uganda through calm, beautiful interactive picture books.",
                             fontSize = 11.sp,
-                            color = Color(0xFF2E7D32),
+                            color = Color(0xFF4E342E),
                             lineHeight = 16.sp
                         )
                     }
