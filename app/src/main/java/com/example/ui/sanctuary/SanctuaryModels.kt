@@ -67,6 +67,16 @@ enum class StorybookThemeStyle {
 /**
  * Storybook Spread representing a single full-screen illustrated learning page.
  */
+/**
+ * Spoken conversational dialogue phrase for early language immersion.
+ */
+data class StorybookPhrase(
+    val lukenye: String,
+    val english: String,
+    val pronunciation: String = "",
+    val speakerEmoji: String = "🗣️"
+)
+
 data class StorybookSpread(
     val bookId: String,
     val pageIndex: Int,
@@ -85,7 +95,11 @@ data class StorybookSpread(
     val narrativeEnglish: String = "",
     val proverbLukenye: String = "",
     val proverbEnglish: String = "",
-    val culturalFact: String = ""
+    val culturalFact: String = "",
+    val katoPromptLukenye: String = "",
+    val katoPromptEnglish: String = "",
+    val culturalSong: String = "",
+    val phrases: List<StorybookPhrase> = emptyList()
 )
 
 /**
@@ -1177,7 +1191,10 @@ fun getLaunchStorybooks(): List<Storybook> {
     )
     booksList.add(Storybook("community", "Abantu", "Community", "🤝", "Storyteller elders, potters & cherished friends", b18Spreads))
 
-    return booksList
+    // Enrich all 36 spreads with spoken dialogue, Kato prompts and cultural songs
+    return booksList.map { book ->
+        book.copy(spreads = book.spreads.map { enrichSpreadWithFullPageContent(it) })
+    }
 }
 
 /**

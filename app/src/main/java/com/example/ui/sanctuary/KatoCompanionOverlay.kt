@@ -63,32 +63,10 @@ import kotlin.math.sin
 @Composable
 fun KatoCompanionOverlay(
     audioManager: AuthenticAudioManager,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    pagePrompt: Pair<String, String>? = null
 ) {
     val coroutineScope = rememberCoroutineScope()
-    val infiniteTransition = rememberInfiniteTransition(label = "KatoBreathingCycle")
-
-    // Idle vertical bobbing (calm 3.2s cycle)
-    val idleBobPhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 6.28318f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3200, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "KatoIdleBob"
-    )
-
-    // Gentle tail wag tilt
-    val tailWag by infiniteTransition.animateFloat(
-        initialValue = -3f,
-        targetValue = 3f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(1600, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "KatoTailWag"
-    )
 
     // Hop and spin bounce animation on tap
     val bounceScale = remember { Animatable(1f) }
@@ -159,8 +137,7 @@ fun KatoCompanionOverlay(
         Box(
             modifier = Modifier
                 .graphicsLayer {
-                    translationY = sin(idleBobPhase) * 4.dp.toPx()
-                    rotationZ = tailWag + bounceRotation.value
+                    rotationZ = bounceRotation.value
                     scaleX = bounceScale.value
                     scaleY = bounceScale.value
                 }
@@ -172,15 +149,26 @@ fun KatoCompanionOverlay(
                     coroutineScope.launch {
                         // Play sound & speech
                         audioManager.playKatoCompanionChirp()
-                        val currentPair = katoPhrases[phraseIndex % katoPhrases.size]
+                        val currentPair = if (pagePrompt != null && (phraseIndex % 2 == 0)) {
+                            pagePrompt
+                        } else {
+                            katoPhrases[phraseIndex % katoPhrases.size]
+                        }
                         phraseIndex++
                         speechBubbleText = currentPair
 
-                        audioManager.speakWord(
-                            lukenyeWord = currentPair.first,
-                            englishWord = currentPair.second,
-                            pronunciation = ""
-                        )
+                        if (pagePrompt != null && currentPair == pagePrompt) {
+                            audioManager.playKatoPagePrompt(
+                                lukenyePrompt = currentPair.first,
+                                englishPrompt = currentPair.second
+                            )
+                        } else {
+                            audioManager.speakWord(
+                                lukenyeWord = currentPair.first,
+                                englishWord = currentPair.second,
+                                pronunciation = ""
+                            )
+                        }
 
                         // Tactile spring bounce
                         bounceScale.animateTo(1.22f, tween(150, easing = FastOutSlowInEasing))

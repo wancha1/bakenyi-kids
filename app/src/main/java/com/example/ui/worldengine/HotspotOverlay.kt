@@ -34,11 +34,13 @@ import androidx.compose.ui.unit.sp
 import com.example.data.model.VocabularyItem
 import com.example.ui.theme.StarGold
 import com.example.ui.theme.SurfaceWhite
+import com.example.ui.theme.WarmCreamBg
 
 @Composable
 fun HotspotOverlay(
     item: VocabularyItem,
     isDiscovered: Boolean,
+    isCompleted: Boolean = false,
     onHotspotTap: (VocabularyItem) -> Unit,
     modifier: Modifier = Modifier
 ) {
@@ -54,23 +56,36 @@ fun HotspotOverlay(
         label = "RipplePulse"
     )
 
+    val itemTag = "hotspot_${item.lukenyeTerm.lowercase()}"
+
     Box(
         modifier = modifier
-            .testTag("hotspot_ensomba")
+            .testTag(itemTag)
             .clickable {
-                Log.d("WORLD_ENGINE_DEBUG", "Hotspot tapped: ${item.lugandaTerm}")
+                Log.d("WORLD_ENGINE_DEBUG", "Hotspot tapped: ${item.lukenyeTerm} (discovered=$isDiscovered, completed=$isCompleted)")
                 onHotspotTap(item)
             },
         contentAlignment = Alignment.Center
     ) {
         // Water Ripple Pulsing Circle
+        val rippleColor = when {
+            isCompleted -> Color(0x66FFD700)
+            isDiscovered -> Color(0x5500E5FF)
+            else -> Color(0x3380D8FF)
+        }
+        val rippleBorder = when {
+            isCompleted -> StarGold
+            isDiscovered -> Color(0xFF00E5FF)
+            else -> Color(0xAA80D8FF)
+        }
+
         Box(
             modifier = Modifier
                 .size(72.dp)
                 .scale(rippleScale)
                 .clip(CircleShape)
-                .background(Color(0x5500E5FF))
-                .border(2.dp, Color(0xFF00E5FF), CircleShape)
+                .background(rippleColor)
+                .border(2.dp, rippleBorder, CircleShape)
         )
 
         // Hotspot Content Badge
@@ -79,11 +94,43 @@ fun HotspotOverlay(
                 modifier = Modifier
                     .size(54.dp)
                     .clip(CircleShape)
-                    .background(if (isDiscovered) StarGold else SurfaceWhite)
-                    .border(3.dp, Color(0xFF00ACC1), CircleShape),
+                    .background(
+                        when {
+                            isCompleted -> StarGold
+                            isDiscovered -> SurfaceWhite
+                            else -> WarmCreamBg.copy(alpha = 0.95f)
+                        }
+                    )
+                    .border(
+                        width = if (isCompleted) 3.dp else 2.dp,
+                        color = when {
+                            isCompleted -> Color(0xFFE65100)
+                            isDiscovered -> Color(0xFF00ACC1)
+                            else -> Color(0xFF81D4FA)
+                        },
+                        shape = CircleShape
+                    ),
                 contentAlignment = Alignment.Center
             ) {
-                Text(text = item.iconEmoji, fontSize = 28.sp)
+                if (isDiscovered || isCompleted) {
+                    Text(text = item.iconEmoji, fontSize = 28.sp)
+                } else {
+                    Text(text = "🌊", fontSize = 24.sp)
+                }
+
+                // Completion Star Overlay Badge
+                if (isCompleted) {
+                    Box(
+                        modifier = Modifier
+                            .align(Alignment.TopEnd)
+                            .size(18.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFFE65100)),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(text = "⭐", fontSize = 10.sp)
+                    }
+                }
             }
 
             Spacer(modifier = Modifier.height(4.dp))
@@ -91,11 +138,14 @@ fun HotspotOverlay(
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color.Black.copy(alpha = 0.7f))
+                    .background(
+                        if (isCompleted) Color(0xFF2E7D32).copy(alpha = 0.85f)
+                        else Color.Black.copy(alpha = 0.75f)
+                    )
                     .padding(horizontal = 8.dp, vertical = 2.dp)
             ) {
                 Text(
-                    text = item.lugandaTerm,
+                    text = if (isDiscovered || isCompleted) item.lukenyeTerm else "???",
                     fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
                     color = SurfaceWhite

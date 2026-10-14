@@ -8,7 +8,7 @@ import androidx.room.PrimaryKey
 data class VocabularyEntity(
     @PrimaryKey val id: String,
     val locationId: String,
-    val lugandaTerm: String,
+    val lukenyeTerm: String,
     val englishMeaning: String,
     val phonetic: String,
     val audioPath: String = "",
@@ -24,7 +24,8 @@ data class ChildDiscoveryEntity(
     val locationKey: String,
     val itemKey: String,
     val discoveredAtTimestamp: Long = System.currentTimeMillis(),
-    val updatedAtTimestamp: Long = System.currentTimeMillis()
+    val updatedAtTimestamp: Long = System.currentTimeMillis(),
+    val isCompleted: Boolean = false
 )
 
 @Entity(
@@ -54,7 +55,7 @@ sealed class LocationWorldState {
 // Domain Models
 data class VocabularyItem(
     val id: String,
-    val lugandaTerm: String,
+    val lukenyeTerm: String,
     val englishMeaning: String,
     val phonetic: String,
     val iconEmoji: String = "🐟",

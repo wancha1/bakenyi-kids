@@ -9,6 +9,8 @@ import com.example.data.db.MIGRATION_1_2
 import com.example.data.db.MIGRATION_2_3
 import com.example.data.db.MIGRATION_3_4
 import com.example.data.db.MIGRATION_4_5
+import com.example.data.db.MIGRATION_7_8
+import com.example.data.db.MIGRATION_8_9
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertTrue
@@ -369,6 +371,120 @@ class RoomMigrationTest {
         assertTrue(lessonCursor.moveToFirst())
         assertEquals("L1_1", lessonCursor.getString(lessonCursor.getColumnIndex("lessonId")))
         lessonCursor.close()
+
+        db.close()
+    }
+
+    @Test
+    fun migration7To8_renamesLugandaTermToLukenyeTerm_andPreservesData() {
+        val testDbName = "migration-v7-v8-test.db"
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase(testDbName)
+
+        val factory = FrameworkSQLiteOpenHelperFactory()
+        val callback = object : SupportSQLiteOpenHelper.Callback(7) {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `vocabulary_items` (
+                        `id` TEXT NOT NULL,
+                        `locationId` TEXT NOT NULL,
+                        `lugandaTerm` TEXT NOT NULL,
+                        `englishMeaning` TEXT NOT NULL,
+                        `phonetic` TEXT NOT NULL,
+                        `audioPath` TEXT NOT NULL,
+                        `culturalFact` TEXT NOT NULL,
+                        PRIMARY KEY(`id`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `vocabulary_items` (`id`, `locationId`, `lugandaTerm`, `englishMeaning`, `phonetic`, `audioPath`, `culturalFact`)
+                    VALUES ('V_ENSOMBA', 'FISHING_AREA', 'Ensomba', 'Fish (General)', 'En-sohm-bah', 'audio_ensomba', 'Fish are the heart of Lake Kyoga.')
+                    """.trimIndent()
+                )
+            }
+
+            override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+        }
+
+        val config = SupportSQLiteOpenHelper.Configuration.builder(context)
+            .name(testDbName)
+            .callback(callback)
+            .build()
+
+        val helper = factory.create(config)
+        val db = helper.writableDatabase
+
+        // Apply MIGRATION_7_8
+        MIGRATION_7_8.migrate(db)
+
+        // Verify table exists with lukenyeTerm column
+        val vocabCursor = db.query("SELECT * FROM vocabulary_items WHERE id = 'V_ENSOMBA'")
+        assertTrue("Record must exist after migration 7 to 8", vocabCursor.moveToFirst())
+
+        // Verify lugandaTerm column is gone and lukenyeTerm column contains the preserved data
+        assertEquals(-1, vocabCursor.getColumnIndex("lugandaTerm"))
+        val lukenyeIdx = vocabCursor.getColumnIndex("lukenyeTerm")
+        assertTrue("lukenyeTerm column must exist", lukenyeIdx >= 0)
+        assertEquals("Ensomba", vocabCursor.getString(lukenyeIdx))
+        assertEquals("Fish (General)", vocabCursor.getString(vocabCursor.getColumnIndex("englishMeaning")))
+        vocabCursor.close()
+
+        db.close()
+    }
+
+    @Test
+    fun migration8To9_addsIsCompletedToChildDiscoveries() {
+        val testDbName = "migration-v8-v9-test.db"
+        val context = ApplicationProvider.getApplicationContext<Context>()
+        context.deleteDatabase(testDbName)
+
+        val factory = FrameworkSQLiteOpenHelperFactory()
+        val callback = object : SupportSQLiteOpenHelper.Callback(8) {
+            override fun onCreate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `child_discoveries` (
+                        `childProfileId` TEXT NOT NULL,
+                        `locationKey` TEXT NOT NULL,
+                        `itemKey` TEXT NOT NULL,
+                        `discoveredAtTimestamp` INTEGER NOT NULL,
+                        `updatedAtTimestamp` INTEGER NOT NULL,
+                        PRIMARY KEY(`childProfileId`, `locationKey`, `itemKey`)
+                    )
+                    """.trimIndent()
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `child_discoveries` (`childProfileId`, `locationKey`, `itemKey`, `discoveredAtTimestamp`, `updatedAtTimestamp`)
+                    VALUES ('child-test-1', 'FISHING_AREA', 'V_ENSOMBA', 1234567, 1234567)
+                    """.trimIndent()
+                )
+            }
+
+            override fun onUpgrade(db: SupportSQLiteDatabase, oldVersion: Int, newVersion: Int) {}
+        }
+
+        val config = SupportSQLiteOpenHelper.Configuration.builder(context)
+            .name(testDbName)
+            .callback(callback)
+            .build()
+
+        val helper = factory.create(config)
+        val db = helper.writableDatabase
+
+        // Apply MIGRATION_8_9
+        MIGRATION_8_9.migrate(db)
+
+        // Verify isCompleted column exists and defaults to 0 (false)
+        val cursor = db.query("SELECT * FROM child_discoveries WHERE childProfileId = 'child-test-1'")
+        assertTrue(cursor.moveToFirst())
+        val isCompletedIdx = cursor.getColumnIndex("isCompleted")
+        assertTrue("isCompleted column must exist in child_discoveries", isCompletedIdx >= 0)
+        assertEquals(0, cursor.getInt(isCompletedIdx))
+        cursor.close()
 
         db.close()
     }

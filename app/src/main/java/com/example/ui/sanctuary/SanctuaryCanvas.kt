@@ -37,51 +37,11 @@ fun SanctuaryCanvas(
     themeStyle: StorybookThemeStyle,
     modifier: Modifier = Modifier
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "Storybook25DCalmCycle")
-
-    // 1. Slow, continuous time progression for atmospheric waves & sunlight (12-second cycle)
-    val slowClock by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(12000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "AtmosphericClock"
-    )
-
-    // 2. Water Shimmer & Wave harmonics (5.5-second cycle)
-    val waterPhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = (2 * PI).toFloat(),
-        animationSpec = infiniteRepeatable(
-            animation = tween(5500, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "WaterHarmonics"
-    )
-
-    // 3. Gentle wind sway for foliage and papyrus reeds (4-second reverse loop)
-    val windSway by infiniteTransition.animateFloat(
-        initialValue = -1f,
-        targetValue = 1f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(4000, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "WindSway"
-    )
-
-    // 4. Soft sunbeam / fire glow breathing pulse (3.5-second loop)
-    val lightPulse by infiniteTransition.animateFloat(
-        initialValue = 0.85f,
-        targetValue = 1.15f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3500, easing = LinearEasing),
-            repeatMode = RepeatMode.Reverse
-        ),
-        label = "AmbientLightPulse"
-    )
+    // Static resting values: No animations, crisp, calm, and battery-friendly
+    val slowClock = 0f
+    val waterPhase = 0f
+    val windSway = 0f
+    val lightPulse = 1.0f
 
     // Stable random seed for floating dust motes / fireflies / embers
     val particleSeeds = remember {
@@ -127,16 +87,6 @@ fun SanctuaryCanvas(
                     drawFishermanSong25D(width, height, waterPhase, windSway, lightPulse, slowClock)
                 }
             }
-
-            // Layer 1: Ambient 2.5D Depth Dust Motes / Sunlight Sparkles / Evening Fireflies
-            drawAtmosphericParticles(
-                width = width,
-                height = height,
-                themeStyle = themeStyle,
-                particles = particleSeeds,
-                clock = slowClock,
-                pulse = lightPulse
-            )
 
             // Layer 2: Physical Picture-Book Center Spine Fold & Soft Vignette
             drawStorybookSpineFoldAndVignette(width, height)

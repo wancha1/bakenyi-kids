@@ -14,12 +14,16 @@ import com.example.data.model.World
 import com.example.data.repository.BakenyeRepository
 import com.example.ui.sanctuary.DiurnalTimeOfDay
 import com.example.ui.sanctuary.SanctuaryBiome
+import com.example.data.model.ChildDiscoveryEntity
+import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.isActive
@@ -58,6 +62,7 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
 
     val syncState: StateFlow<com.example.sync.SyncState>
     val sanctuaryState: StateFlow<SanctuaryStateEntity>
+    val fishingDiscoveries: StateFlow<List<ChildDiscoveryEntity>>
 
     private val _selectedWorldId = MutableStateFlow(1)
     private val _activeTab = MutableStateFlow(NavigationTab.LEARN)
@@ -91,6 +96,21 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
                 scope = viewModelScope,
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = SanctuaryStateEntity()
+            )
+
+        @OptIn(ExperimentalCoroutinesApi::class)
+        fishingDiscoveries = repository.userProfile
+            .flatMapLatest { profile ->
+                if (profile != null) {
+                    repository.getDiscoveriesForLocation(profile.id, "FISHING_AREA")
+                } else {
+                    flowOf(emptyList())
+                }
+            }
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(5000),
+                initialValue = emptyList()
             )
 
         viewModelScope.launch {
@@ -306,6 +326,55 @@ class BakenyeViewModel(application: Application) : AndroidViewModel(application)
         viewModelScope.launch {
             syncManager.syncNow()
         }
+    }
+
+    fun recordDiscovery(speciesKey: String) {
+        viewModelScope.launch {
+            val profile = uiState.value.profile
+            if (profile.id.isNotEmpty()) {
+                repository.recordDiscovery(childProfileId = profile.id, locationKey = "FISHING_AREA", speciesKey = speciesKey, isCompleted = false)
+            } else {
+                repository.recordDiscovery(locationKey = "FISHING_AREA", speciesKey = speciesKey, isCompleted = false)
+            }
+        }
+    }
+
+    suspend fun completeDiscoveryChallenge(speciesKey: String): Boolean {
+        val profile = uiState.value.profile
+        val isNewReward = if (profile.id.isNotEmpty()) {
+            repository.completeDiscoveryChallenge(
+                childProfileId = profile.id,
+                locationKey = "FISHING_AREA",
+                speciesKey = speciesKey,
+                starReward = 5,
+                coinReward = 20
+            )
+        } else {
+            repository.completeDiscoveryChallenge(
+                locationKey = "FISHING_AREA",
+                speciesKey = speciesKey,
+                starReward = 5,
+                coinReward = 20
+            )
+        }
+        if (isNewReward) {
+            playSuccessSound()
+        }
+        return isNewReward
+    }
+
+    suspend fun generateQuizOptions(targetLukenyeTerm: String): List<String> {
+        val verifiedVocabulary = listOf("Ensomba", "Mukene", "Ngege", "Eryato", "Ekitimba")
+        val dbVocab = repository.getAllVocabularyOnce().map { it.lukenyeTerm.trim() }
+        val allDistractors = (dbVocab + verifiedVocabulary)
+            .filter { it.isNotBlank() && !it.equals(targetLukenyeTerm, ignoreCase = true) }
+            .distinct()
+            .shuffled()
+
+        // Select up to 3 distinct distractors from verified Lukenye vocabulary
+        val selectedDistractors = allDistractors.take(3)
+        // Combine target with distractors and shuffle options
+        return (selectedDistractors + targetLukenyeTerm).shuffled()
     }
 }
 

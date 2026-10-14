@@ -1,6 +1,7 @@
 package com.example.ui.worldengine
 
 import android.util.Log
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -42,13 +43,17 @@ import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.geometry.Offset
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -84,26 +89,29 @@ fun WorldEngineScreen(
     viewModel: BakenyeViewModel,
     onNavigateBack: () -> Unit = {}
 ) {
+    // Intercept hardware/system back button to safely return to previous destination
+    BackHandler {
+        onNavigateBack()
+    }
+
     val context = LocalContext.current
     val audioManager = remember { AuthenticAudioManager.getInstance(context) }
+    val coroutineScope = rememberCoroutineScope()
     
     val uiState by viewModel.uiState.collectAsState()
+    val fishingDiscoveries by viewModel.fishingDiscoveries.collectAsState()
+
+    val discoveredKeys = remember(fishingDiscoveries) {
+        fishingDiscoveries.map { it.itemKey }.toSet()
+    }
+    val completedKeys = remember(fishingDiscoveries) {
+        fishingDiscoveries.filter { it.isCompleted }.map { it.itemKey }.toSet()
+    }
 
     var worldState by remember { mutableStateOf<LocationWorldState>(LocationWorldState.Arrival) }
     var isPlayingAudio by remember { mutableStateOf(false) }
-    var selectedItem by remember {
-        mutableStateOf(
-            VocabularyItem(
-                id = "V_ENSOMBA",
-                lugandaTerm = "Ensomba",
-                englishMeaning = "Fish (General)",
-                phonetic = "En-sohm-bah",
-                iconEmoji = "🐟",
-                culturalFact = "Fish are the heart of life along Lake Kyoga Shores.",
-                audioResName = "audio_ensomba"
-            )
-        )
-    }
+    var dynamicQuizOptions by remember { mutableStateOf<List<String>>(emptyList()) }
+    var isNewRewardEarned by remember { mutableStateOf(false) }
 
     val fishingLocation = remember {
         HeritageLocation(
@@ -115,14 +123,28 @@ fun WorldEngineScreen(
                 VocabularyItem("V_ENSOMBA", "Ensomba", "Fish (General)", "En-sohm-bah", "🐟", "Fish are the heart of life along Lake Kyoga Shores.", "audio_ensomba"),
                 VocabularyItem("V_MUKENE", "Mukene", "Silver Cyprinid Fish", "Moo-keh-neh", "🐟", "Tiny silver fish harvested under moonlight with lanterns.", "audio_mukene"),
                 VocabularyItem("V_NGEGE", "Ngege", "Tilapia Fish", "Ngeh-gheh", "🐠", "Prized freshwater fish cooked in rich sesame paste.", "audio_ngege"),
-                VocabularyItem("V_ERYATO", "Eryato", "Wooden Canoe", "Eh-ryah-toh", "🛶", "Handcrafted canoe hollowed from sacred MVule trees.", "audio_eryato"),
-                VocabularyItem("V_EKITIMBA", "Ekitimba", "Fishing Net", "Eh-kee-teem-bah", "🕸️", "Hand-knotted reed mesh passed down through fisherman elders.", "audio_ekitimba")
+                VocabularyItem("V_ERYATO", "Eryato", "Traditional Wooden Canoe", "Eh-ryah-toh", "🛶", "Handcrafted canoe hollowed from sacred MVule trees.", "audio_eryato"),
+                VocabularyItem("V_EKITIMBA", "Ekitimba", "Woven Fishing Net", "Eh-kee-teem-bah", "🕸️", "Hand-knotted reed mesh passed down through fisherman elders.", "audio_ekitimba")
             )
         )
     }
 
+    var selectedItem by remember {
+        mutableStateOf(fishingLocation.discoveries[0])
+    }
+
+    val hotspotPositions = remember {
+        mapOf(
+            "V_ENSOMBA" to (Alignment.Center to Offset(10f, 15f)),
+            "V_MUKENE" to (Alignment.CenterStart to Offset(35f, -35f)),
+            "V_NGEGE" to (Alignment.CenterEnd to Offset(-35f, 45f)),
+            "V_ERYATO" to (Alignment.TopStart to Offset(40f, 55f)),
+            "V_EKITIMBA" to (Alignment.TopEnd to Offset(-40f, 65f))
+        )
+    }
+
     var guideSpeech by remember {
-        mutableStateOf("Oli otya! I am Kato! Look at the water ripples on Lake Kyoga! Tap the fish hotspot!")
+        mutableStateOf("Oli otya! I am Kato the Otter! Explore the water ripples and reeds across Lake Kyoga to find all 5 treasures!")
     }
 
     // Cleanup audio manager when screen disposes
@@ -156,46 +178,107 @@ fun WorldEngineScreen(
                 isWaterAnimating = true
             )
 
-            // 2. Hotspot Ripple Overlay (Ensomba Hotspot)
-            HotspotOverlay(
-                item = selectedItem,
-                isDiscovered = worldState !is LocationWorldState.Arrival,
-                onHotspotTap = { item ->
-                    Log.d("WORLD_ENGINE_DEBUG", "Flow D: Tapped Ensomba hotspot. Transitioning Arrival -> Discovery -> Learning")
-                    selectedItem = item
-                    worldState = LocationWorldState.Discovery
-                    guideSpeech = "Webale! You found ${item.lugandaTerm}! Let's learn to pronounce it together!"
-                    
-                    // Trigger Audio Pronunciation
-                    isPlayingAudio = true
-                    audioManager.playPronunciation(item.audioResName) {
-                        isPlayingAudio = false
-                        worldState = LocationWorldState.Learning
-                    }
-
-                    // Record discovery in DB
-                    viewModel.selectLocationNode("FISHING_AREA")
-                },
+            // 2. Exploration Progress Tracker HUD Card
+            Surface(
                 modifier = Modifier
-                    .align(Alignment.Center)
-                    .offset(x = 40.dp, y = 30.dp)
-            )
+                    .align(Alignment.TopCenter)
+                    .padding(top = 10.dp)
+                    .testTag("adventure_progress_tracker"),
+                shape = RoundedCornerShape(18.dp),
+                color = SurfaceWhite.copy(alpha = 0.94f),
+                shadowElevation = 3.dp,
+                border = BorderStroke(1.dp, Color(0xFFE0E0E0))
+            ) {
+                Row(
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "🎣 Lake Kyoga:",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = OliveGreenPrimary
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Found ${discoveredKeys.size}/5",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = TextPrimaryDark
+                    )
+                    Text(text = " • ", fontSize = 12.sp, color = Color.Gray)
+                    Text(
+                        text = "Mastered ${completedKeys.size}/5 ⭐",
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFFE65100)
+                    )
+                }
+            }
 
-            // 3. Kato Otter Companion Anchor
+            // 3. Five Interactive Lake Kyoga Hotspots
+            fishingLocation.discoveries.forEach { item ->
+                val isDiscovered = discoveredKeys.contains(item.id)
+                val isCompleted = completedKeys.contains(item.id)
+                val pos = hotspotPositions[item.id] ?: (Alignment.Center to Offset.Zero)
+
+                HotspotOverlay(
+                    item = item,
+                    isDiscovered = isDiscovered,
+                    isCompleted = isCompleted,
+                    onHotspotTap = { tappedItem ->
+                        Log.d("WORLD_ENGINE_DEBUG", "Tapped hotspot: ${tappedItem.lukenyeTerm}")
+                        selectedItem = tappedItem
+                        val alreadyDiscovered = discoveredKeys.contains(tappedItem.id)
+                        if (!alreadyDiscovered) {
+                            worldState = LocationWorldState.Discovery
+                            guideSpeech = "Webale! You found ${tappedItem.lukenyeTerm}! Let's learn to pronounce it together!"
+                            viewModel.recordDiscovery(tappedItem.id)
+                            isPlayingAudio = true
+                            audioManager.playPronunciation(tappedItem.audioResName) {
+                                isPlayingAudio = false
+                                worldState = LocationWorldState.Learning
+                            }
+                        } else {
+                            worldState = LocationWorldState.Learning
+                            guideSpeech = "Reviewing ${tappedItem.lukenyeTerm}! Listen closely to the authentic pronunciation."
+                            isPlayingAudio = true
+                            audioManager.playPronunciation(tappedItem.audioResName) {
+                                isPlayingAudio = false
+                            }
+                        }
+                    },
+                    modifier = Modifier
+                        .align(pos.first)
+                        .offset(x = pos.second.x.dp, y = pos.second.y.dp)
+                )
+            }
+
+            // 4. Kato Otter Companion Anchor
             KatoOtterCompanion(
                 worldState = worldState,
                 speechText = guideSpeech,
                 isPlayingAudio = isPlayingAudio,
                 onKatoTap = {
-                    Log.d("WORLD_ENGINE_DEBUG", "Flow C: Tapped Kato. Transitioning Arrival -> Discovery")
-                    if (worldState is LocationWorldState.Arrival) {
-                        worldState = LocationWorldState.Discovery
-                        guideSpeech = "Look close at Lake Kyoga! Tap the shimmering fish ripple in the water!"
+                    Log.d("WORLD_ENGINE_DEBUG", "Tapped Kato companion")
+                    val remaining = fishingLocation.discoveries.filterNot { discoveredKeys.contains(it.id) }
+                    val toMaster = fishingLocation.discoveries.filterNot { completedKeys.contains(it.id) }
+                    if (remaining.isNotEmpty()) {
+                        val nextItem = remaining.first()
+                        guideSpeech = "Kato's Clue: Look around Lake Kyoga for water ripples and reeds to find ${nextItem.englishMeaning}!"
                         isPlayingAudio = true
                         audioManager.playKatoVoice("welcome") {
                             isPlayingAudio = false
                         }
+                    } else if (toMaster.isNotEmpty()) {
+                        val nextItem = toMaster.first()
+                        guideSpeech = "Kato's Clue: Tap ${nextItem.lukenyeTerm} to complete the quiz and earn its golden star! ⭐"
+                        isPlayingAudio = true
+                        audioManager.playKatoVoice("cheer") {
+                            isPlayingAudio = false
+                        }
                     } else {
+                        guideSpeech = "Incredible! You have discovered and mastered all 5 Lake Kyoga treasures! 🏆"
                         isPlayingAudio = true
                         audioManager.playKatoVoice("cheer") {
                             isPlayingAudio = false
@@ -207,8 +290,8 @@ fun WorldEngineScreen(
                     .padding(start = 16.dp, bottom = 24.dp)
             )
 
-            // 4. Learning Journey Modal Overlays
-            when (val currentState = worldState) {
+            // 5. Learning Journey Modal Overlays
+            when (worldState) {
                 is LocationWorldState.Learning -> {
                     VocabularyLearningModal(
                         item = selectedItem,
@@ -222,7 +305,7 @@ fun WorldEngineScreen(
                         onNextToPractice = {
                             Log.d("WORLD_ENGINE_DEBUG", "Transitioning Learning -> Practice")
                             worldState = LocationWorldState.Practice
-                            guideSpeech = "Great job! Now let's practice repeating ${selectedItem.lugandaTerm}!"
+                            guideSpeech = "Great job! Now let's practice repeating ${selectedItem.lukenyeTerm}!"
                         },
                         onClose = { worldState = LocationWorldState.Arrival }
                     )
@@ -238,9 +321,12 @@ fun WorldEngineScreen(
                             }
                         },
                         onStartChallenge = {
-                            Log.d("WORLD_ENGINE_DEBUG", "Transitioning Practice -> Challenge")
-                            worldState = LocationWorldState.Challenge
-                            guideSpeech = "Time for the Fishing Area Challenge! Pick the right word for Fish!"
+                            coroutineScope.launch {
+                                Log.d("WORLD_ENGINE_DEBUG", "Generating dynamic quiz options for ${selectedItem.lukenyeTerm}")
+                                dynamicQuizOptions = viewModel.generateQuizOptions(selectedItem.lukenyeTerm)
+                                worldState = LocationWorldState.Challenge
+                                guideSpeech = "Time for the Fishing Area Challenge! Which Lukenye word means ${selectedItem.englishMeaning}?"
+                            }
                         },
                         onClose = { worldState = LocationWorldState.Arrival }
                     )
@@ -248,25 +334,33 @@ fun WorldEngineScreen(
                 is LocationWorldState.Challenge -> {
                     ChallengeGameModal(
                         targetItem = selectedItem,
-                        options = listOf("Ensomba", "Inzu", "Taata", "Omwana"),
+                        options = if (dynamicQuizOptions.isNotEmpty()) dynamicQuizOptions else listOf(selectedItem.lukenyeTerm),
                         onSuccess = {
-                            Log.d("WORLD_ENGINE_DEBUG", "Challenge passed! Transitioning Challenge -> Reward")
-                            worldState = LocationWorldState.Reward
-                            guideSpeech = "Kulika! You earned the Lake Kyoga Fisherman Badge!"
+                            coroutineScope.launch {
+                                Log.d("WORLD_ENGINE_DEBUG", "Challenge passed! Evaluating reward for ${selectedItem.lukenyeTerm}")
+                                isNewRewardEarned = viewModel.completeDiscoveryChallenge(selectedItem.id)
+                                worldState = LocationWorldState.Reward
+                                guideSpeech = if (isNewRewardEarned) {
+                                    "Kulika! You mastered ${selectedItem.lukenyeTerm} and earned 5 stars! ⭐"
+                                } else {
+                                    "Well done! You reviewed ${selectedItem.lukenyeTerm}!"
+                                }
+                            }
                         },
                         onClose = { worldState = LocationWorldState.Arrival }
                     )
                 }
                 is LocationWorldState.Reward -> {
                     RewardBadgeModal(
-                        badgeTitle = "Lake Kyoga Fisherman",
-                        badgeEmoji = "🐟",
-                        description = "Discovered Ensomba and mastered authentic Bakenye lakeside vocabulary!",
-                        starsEarned = 5,
+                        badgeTitle = if (isNewRewardEarned) "Lake Kyoga Master: ${selectedItem.lukenyeTerm}" else "Discovery Revisited: ${selectedItem.lukenyeTerm}",
+                        badgeEmoji = selectedItem.iconEmoji,
+                        description = selectedItem.culturalFact,
+                        starsEarned = if (isNewRewardEarned) 5 else 0,
+                        isNewReward = isNewRewardEarned,
                         onClaim = {
-                            Log.d("WORLD_ENGINE_DEBUG", "Reward claimed! Returning Arrival state")
+                            Log.d("WORLD_ENGINE_DEBUG", "Reward claimed. Returning to Arrival state.")
                             worldState = LocationWorldState.Arrival
-                            guideSpeech = "You are a true Bakenye Heritage Explorer! Explore more water life tomorrow!"
+                            guideSpeech = "Webale! Discovered ${discoveredKeys.size}/5 • Mastered ${completedKeys.size}/5! Explore more water treasures!"
                         }
                     )
                 }
@@ -405,7 +499,7 @@ fun VocabularyLearningModal(
 
                 Spacer(modifier = Modifier.height(12.dp))
 
-                Text(text = item.lugandaTerm, fontSize = 28.sp, fontWeight = FontWeight.Black, color = OliveGreenPrimary)
+                Text(text = item.lukenyeTerm, fontSize = 28.sp, fontWeight = FontWeight.Black, color = OliveGreenPrimary)
                 Text(text = item.englishMeaning, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = TextSecondaryMuted)
 
                 Spacer(modifier = Modifier.height(8.dp))
@@ -504,7 +598,7 @@ fun PracticeInteractionModal(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(text = item.lugandaTerm, fontSize = 26.sp, fontWeight = FontWeight.Black, color = OliveGreenPrimary)
+                Text(text = item.lukenyeTerm, fontSize = 26.sp, fontWeight = FontWeight.Black, color = OliveGreenPrimary)
 
                 Spacer(modifier = Modifier.height(20.dp))
 
@@ -549,18 +643,31 @@ fun ChallengeGameModal(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(text = "FISHING AREA CHALLENGE", fontSize = 11.sp, fontWeight = FontWeight.Black, color = OliveGreenPrimary)
+                Text(
+                    text = "LAKE KYOGA CULTURAL CHALLENGE",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Black,
+                    color = OliveGreenPrimary
+                )
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(text = "Which Bakenye word means Fish?", fontSize = 16.sp, fontWeight = FontWeight.Bold, color = TextPrimaryDark, textAlign = TextAlign.Center)
+                Text(
+                    text = "Which Lukenye word means:\n\"${targetItem.englishMeaning}\"?",
+                    fontSize = 16.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimaryDark,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.testTag("quiz_question_text")
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 options.forEach { option ->
                     val isSelected = selectedOption == option
+                    val optionTag = "quiz_option_${option.lowercase().replace(" ", "_")}"
                     Button(
                         onClick = {
                             selectedOption = option
-                            if (option == targetItem.lugandaTerm) {
+                            if (option.equals(targetItem.lukenyeTerm, ignoreCase = true)) {
                                 isError = false
                                 onSuccess()
                             } else {
@@ -570,7 +677,8 @@ fun ChallengeGameModal(
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(vertical = 4.dp)
-                            .height(48.dp),
+                            .height(48.dp)
+                            .testTag(optionTag),
                         colors = ButtonDefaults.buttonColors(
                             containerColor = if (isSelected && isError) Color(0xFFFFEBEE) else WarmCreamBg
                         ),
@@ -587,7 +695,12 @@ fun ChallengeGameModal(
 
                 if (isError) {
                     Spacer(modifier = Modifier.height(8.dp))
-                    Text(text = "Try again! Kato believes in you! 🦦", fontSize = 12.sp, color = Color.Red)
+                    Text(
+                        text = "Try again! '$selectedOption' is not '${targetItem.englishMeaning}'. Kato believes in you! 🦦",
+                        fontSize = 12.sp,
+                        color = Color.Red,
+                        textAlign = TextAlign.Center
+                    )
                 }
             }
         }
@@ -600,6 +713,7 @@ fun RewardBadgeModal(
     badgeEmoji: String,
     description: String,
     starsEarned: Int,
+    isNewReward: Boolean = true,
     onClaim: () -> Unit
 ) {
     Dialog(onDismissRequest = onClaim) {
@@ -617,7 +731,12 @@ fun RewardBadgeModal(
                     .verticalScroll(rememberScrollState()),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Text(text = "HERITAGE BADGE UNLOCKED! 🎉", fontSize = 13.sp, fontWeight = FontWeight.Black, color = OliveGreenPrimary)
+                Text(
+                    text = if (isNewReward) "HERITAGE DISCOVERY MASTERED! 🎉" else "DISCOVERY REVISITED! 📚",
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Black,
+                    color = OliveGreenPrimary
+                )
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Box(
@@ -633,14 +752,31 @@ fun RewardBadgeModal(
                 }
 
                 Spacer(modifier = Modifier.height(12.dp))
-                Text(text = badgeTitle, fontSize = 22.sp, fontWeight = FontWeight.Black, color = OliveGreenPrimary)
+                Text(
+                    text = badgeTitle,
+                    fontSize = 20.sp,
+                    fontWeight = FontWeight.Black,
+                    color = OliveGreenPrimary,
+                    textAlign = TextAlign.Center
+                )
                 Spacer(modifier = Modifier.height(6.dp))
-                Text(text = description, fontSize = 13.sp, color = TextSecondaryMuted, textAlign = TextAlign.Center)
+                Text(
+                    text = description,
+                    fontSize = 13.sp,
+                    color = TextSecondaryMuted,
+                    textAlign = TextAlign.Center
+                )
 
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text(text = "+$starsEarned ⭐", fontSize = 18.sp, fontWeight = FontWeight.Black, color = GoldText)
+                    if (isNewReward) {
+                        Text(text = "+$starsEarned ⭐", fontSize = 18.sp, fontWeight = FontWeight.Black, color = GoldText)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(text = "+20 🪙", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color(0xFFE65100))
+                    } else {
+                        Text(text = "+0 ⭐ (Already Mastered)", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = TextSecondaryMuted)
+                    }
                 }
 
                 Spacer(modifier = Modifier.height(20.dp))

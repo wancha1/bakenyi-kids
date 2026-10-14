@@ -11,6 +11,10 @@ import com.example.data.db.MIGRATION_1_2
 import com.example.data.db.MIGRATION_2_3
 import com.example.data.db.MIGRATION_3_4
 import com.example.data.db.MIGRATION_4_5
+import com.example.data.db.MIGRATION_5_6
+import com.example.data.db.MIGRATION_6_7
+import com.example.data.db.MIGRATION_7_8
+import com.example.data.db.MIGRATION_8_9
 import com.example.data.model.SyncOutboxEntity
 import com.example.data.model.UserProfile
 import com.example.data.repository.BakenyeRepository
@@ -55,7 +59,16 @@ class OfflineSyncEngineTest {
         WorkManagerTestInitHelper.initializeTestWorkManager(context)
 
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9
+            )
             .allowMainThreadQueries()
             .build()
 
@@ -270,7 +283,16 @@ class OfflineSyncEngineTest {
         context.deleteDatabase("sync_restart_test.db")
 
         val db1 = Room.databaseBuilder(context, AppDatabase::class.java, "sync_restart_test.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9
+            )
             .allowMainThreadQueries()
             .build()
 
@@ -286,7 +308,16 @@ class OfflineSyncEngineTest {
 
         // Reopen database
         val db2 = Room.databaseBuilder(context, AppDatabase::class.java, "sync_restart_test.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9
+            )
             .allowMainThreadQueries()
             .build()
 

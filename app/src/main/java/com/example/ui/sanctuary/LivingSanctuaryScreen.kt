@@ -2,14 +2,10 @@ package com.example.ui.sanctuary
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInVertically
 import androidx.compose.animation.slideOutVertically
 import androidx.compose.foundation.Canvas
@@ -21,16 +17,17 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
@@ -43,6 +40,8 @@ import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
+import androidx.compose.material3.ScrollableTabRow
+import androidx.compose.material3.Tab
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -59,14 +58,15 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
@@ -77,16 +77,16 @@ import com.example.language.enforcer.VerificationStateEnforcer
 import com.example.language.model.LanguageContent
 import com.example.language.model.RenderableLanguageContent
 import com.example.ui.BakenyeViewModel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.cos
-import kotlin.math.sin
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun LivingSanctuaryScreen(
     viewModel: BakenyeViewModel,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    activePageIndex: Int = -1,
+    onNavigateToLibrary: () -> Unit = {},
+    onPageChanged: (Int) -> Unit = {}
 ) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
@@ -101,9 +101,13 @@ fun LivingSanctuaryScreen(
     val spreads = remember { getAllStorybookSpreads() }
 
     // Map Room activeBiome to page index
-    val initialPageIndex = remember(sanctuaryStateEntity.activeBiome) {
-        val index = spreads.indexOfFirst { it.biome.name == sanctuaryStateEntity.activeBiome }
-        if (index >= 0) index else 0
+    val initialPageIndex = remember(sanctuaryStateEntity.activeBiome, activePageIndex) {
+        if (activePageIndex in spreads.indices) {
+            activePageIndex
+        } else {
+            val index = spreads.indexOfFirst { it.biome.name == sanctuaryStateEntity.activeBiome }
+            if (index >= 0) index else 0
+        }
     }
 
     // Page turn state with physical page turn rustle sound effect
@@ -113,11 +117,19 @@ fun LivingSanctuaryScreen(
         onPageTurnSound = { audioManager.playPageTurnSound() }
     )
 
+    // Sync external activePageIndex if changed
+    LaunchedEffect(activePageIndex) {
+        if (activePageIndex in spreads.indices && pageTurnState.currentPage != activePageIndex) {
+            pageTurnState.snapToPage(activePageIndex)
+        }
+    }
+
     // Save spread to Room DB on page change
     LaunchedEffect(pageTurnState.currentPage) {
         if (pageTurnState.currentPage in spreads.indices) {
             val spread = spreads[pageTurnState.currentPage]
             viewModel.updateSanctuaryBiome(spread.biome)
+            onPageChanged(pageTurnState.currentPage)
         }
     }
 
@@ -125,6 +137,7 @@ fun LivingSanctuaryScreen(
     var showBookSelector by remember { mutableStateOf(false) }
     var showDiscoveredWords by remember { mutableStateOf(false) }
     var showMusicalPlaypad by remember { mutableStateOf(false) }
+    var showPageContentModal by remember { mutableStateOf(false) }
     var discoveredObjectIds by remember { mutableStateOf(setOf<String>()) }
 
     var activeObject by remember { mutableStateOf<StorybookObject?>(null) }
@@ -136,38 +149,46 @@ fun LivingSanctuaryScreen(
         }
     }
 
+    val currentSpread = spreads.getOrElse(pageTurnState.currentPage) { spreads[0] }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .background(Color(0xFFEDE6D6)) // Warm linen picture-book desk canvas
+            .background(Color(0xFFEDE4D3)) // Warm textured picture-book linen desk
             .testTag("living_sanctuary_screen")
     ) {
-        // Physical Picture-Book Hardcover Frame with 2.5D Stacked Page Edges
+        // Picture-Book Frame with Artisanal Leather & Gold Binding Seam
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(horizontal = 6.dp, vertical = 6.dp)
-                .shadow(elevation = 12.dp, shape = RoundedCornerShape(26.dp))
-                .clip(RoundedCornerShape(26.dp))
-                .border(3.5.dp, Color(0xFFC4A482), RoundedCornerShape(26.dp))
+                .padding(horizontal = 4.dp, vertical = 2.dp)
+                .shadow(elevation = 14.dp, shape = RoundedCornerShape(22.dp))
+                .clip(RoundedCornerShape(22.dp))
                 .background(Color(0xFFFFFDF8))
+                .border(
+                    3.dp,
+                    Brush.verticalGradient(
+                        listOf(Color(0xFFD4AF37), Color(0xFFC4A482), Color(0xFF8D6E63))
+                    ),
+                    RoundedCornerShape(22.dp)
+                )
         ) {
             Column(modifier = Modifier.fillMaxSize()) {
-                val currentSpread = spreads.getOrElse(pageTurnState.currentPage) { spreads[0] }
-
-                // 1. Storybook Header with Bookmark Ribbon, Word Journal, Instruments & Discreet Parent Clasp
+                // 1. Redesigned Storybook Header Ribbon
                 StorybookHeader(
                     currentSpread = currentSpread,
                     totalBooks = books.size,
+                    currentPage = pageTurnState.currentPage,
                     totalPages = spreads.size,
                     discoveredCount = discoveredObjectIds.size,
                     onBookRibbonClicked = { showBookSelector = true },
                     onDiscoveredWordsClicked = { showDiscoveredWords = true },
                     onMusicPlaypadClicked = { showMusicalPlaypad = true },
+                    onPageContentClicked = { showPageContentModal = true },
                     onParentGateUnlocked = { showParentOverlay = true }
                 )
 
-                // 2. Full-Screen Gentle Physical Paper Page-Turn Container
+                // 2. Full-Screen Paper Page-Turn Container with Dynamic Adaptive Geometry
                 Box(
                     modifier = Modifier
                         .weight(1f)
@@ -191,8 +212,10 @@ fun LivingSanctuaryScreen(
                     }
                 }
 
-                // 3. Storybook Footer with Page Controls & Spread Indicator
-                StorybookFooter(
+                // 3. Grounded Storybook Reading Deck (Narration & Built-In Page Navigation)
+                StorybookReadingDeck(
+                    spread = currentSpread,
+                    audioManager = audioManager,
                     currentPage = pageTurnState.currentPage,
                     totalPages = spreads.size,
                     onPrevClicked = {
@@ -204,12 +227,13 @@ fun LivingSanctuaryScreen(
                         scope.launch {
                             pageTurnState.turnToNext()
                         }
-                    }
+                    },
+                    onViewAllPageContent = { showPageContentModal = true }
                 )
             }
         }
 
-        // 4. Storybook Tactile Reading Card (Audio-first interactive pronunciation)
+        // 4. Tactile Reading Card Modal for Selected Vocabulary Object
         activeRenderableContent?.let { renderable ->
             activeObject?.let { obj ->
                 StorybookReadingCard(
@@ -222,12 +246,12 @@ fun LivingSanctuaryScreen(
                     },
                     modifier = Modifier
                         .align(Alignment.BottomCenter)
-                        .padding(bottom = 56.dp, start = 14.dp, end = 14.dp)
+                        .padding(bottom = 80.dp, start = 12.dp, end = 12.dp)
                 )
             }
         }
 
-        // 5. Calm Book Shelf / Bookmark Selector Modal
+        // 5. Illustrated Book Shelf Library Modal
         if (showBookSelector) {
             BookSelectorModal(
                 books = books,
@@ -271,39 +295,58 @@ fun LivingSanctuaryScreen(
                 onDismiss = { showParentOverlay = false }
             )
         }
+
+        // 9. Full Page Content Detail Modal
+        if (showPageContentModal) {
+            PageContentDetailModal(
+                spread = currentSpread,
+                audioManager = audioManager,
+                onDismiss = { showPageContentModal = false }
+            )
+        }
     }
 }
 
 /**
- * Storybook Header with Book Title, Bookmark Ribbon, Discovered Words counter,
- * Musical Playpad button, and Discreet Parent Clasp.
+ * Redesigned Storybook Header Ribbon with Luxury Leather Trim,
+ * Book Title Pill, Page Indicator, and Icon Action Cluster.
  */
 @Composable
 private fun StorybookHeader(
     currentSpread: StorybookSpread,
     totalBooks: Int,
+    currentPage: Int,
     totalPages: Int,
     discoveredCount: Int,
     onBookRibbonClicked: () -> Unit,
     onDiscoveredWordsClicked: () -> Unit,
     onMusicPlaypadClicked: () -> Unit,
+    onPageContentClicked: () -> Unit,
     onParentGateUnlocked: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .background(Color(0xFFEFE8D8))
-            .padding(horizontal = 12.dp, vertical = 6.dp),
+            .statusBarsPadding()
+            .background(Color(0xFFEFE6D6))
+            .border(
+                width = 1.dp,
+                color = Color(0xFFDDD2BC)
+            )
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.SpaceBetween
     ) {
-        // Book Selector Ribbon
+        // Book Library Ribbon Button
         Row(
             modifier = Modifier
-                .weight(1f)
-                .clip(RoundedCornerShape(12.dp))
+                .weight(1f, fill = false)
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color(0xFFFFFDF8))
+                .border(1.5.dp, Color(0xFFC4A482), RoundedCornerShape(14.dp))
                 .clickable { onBookRibbonClicked() }
-                .padding(horizontal = 4.dp, vertical = 3.dp),
+                .padding(horizontal = 8.dp, vertical = 5.dp)
+                .testTag("book_ribbon_button"),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Text(
@@ -311,60 +354,110 @@ private fun StorybookHeader(
                 fontSize = 20.sp,
                 modifier = Modifier.padding(end = 6.dp)
             )
-            Column {
+            Column(modifier = Modifier.weight(1f, fill = false)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(
+                        text = currentSpread.bookTitleLukenye,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = Color(0xFF2C1810),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                    Text(
+                        text = " ▾",
+                        fontSize = 11.sp,
+                        color = Color(0xFF8D6E63)
+                    )
+                }
                 Text(
-                    text = "${currentSpread.bookTitleLukenye} • ${currentSpread.bookTitleEnglish}",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = Color(0xFF3E2723)
-                )
-                Text(
-                    text = "${currentSpread.titleLukenye} (Page ${currentSpread.pageNumberInBook}/${currentSpread.totalPagesInBook})",
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Medium,
-                    color = Color(0xFF6D4C41)
+                    text = "${currentSpread.bookTitleEnglish} • Page ${currentSpread.pageNumberInBook}/${currentSpread.totalPagesInBook}",
+                    fontSize = 9.sp,
+                    color = Color(0xFF6D4C41),
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
         }
 
+        Spacer(modifier = Modifier.width(6.dp))
+
+        // Center Page Indicator Badge
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(12.dp))
+                .background(Color(0xFFE3D6C2))
+                .border(1.dp, Color(0xFFC4A482), RoundedCornerShape(12.dp))
+                .padding(horizontal = 7.dp, vertical = 4.dp)
+        ) {
+            Text(
+                text = "${currentPage + 1}/$totalPages",
+                fontSize = 10.sp,
+                fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF3E2723)
+            )
+        }
+
+        Spacer(modifier = Modifier.width(6.dp))
+
+        // Right Action Cluster
         Row(
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(6.dp)
+            horizontalArrangement = Arrangement.spacedBy(5.dp)
         ) {
-            // Words Discovery Journal Button
+            // Full Page Content Button
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFD2B48C).copy(alpha = 0.65f))
-                    .clickable { onDiscoveredWordsClicked() }
-                    .padding(horizontal = 8.dp, vertical = 5.dp)
-                    .testTag("words_journal_header_button")
+                    .background(Color(0xFFFFFDF8))
+                    .border(1.dp, Color(0xFFC4A482), RoundedCornerShape(12.dp))
+                    .clickable { onPageContentClicked() }
+                    .padding(horizontal = 7.dp, vertical = 5.dp)
+                    .testTag("page_content_header_button"),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "⭐ $discoveredCount",
-                    fontSize = 11.sp,
+                    text = "📄 Content",
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     color = Color(0xFF3E2723)
                 )
             }
 
-            // Musical Instruments Button
+            // Word Discovery Journal Button
             Box(
                 modifier = Modifier
                     .clip(RoundedCornerShape(12.dp))
-                    .background(Color(0xFFD2B48C).copy(alpha = 0.65f))
-                    .clickable { onMusicPlaypadClicked() }
-                    .padding(horizontal = 8.dp, vertical = 5.dp)
-                    .testTag("instruments_header_button")
+                    .background(Color(0xFFFFFDF8))
+                    .border(1.dp, Color(0xFFC4A482), RoundedCornerShape(12.dp))
+                    .clickable { onDiscoveredWordsClicked() }
+                    .padding(horizontal = 7.dp, vertical = 5.dp)
+                    .testTag("words_journal_header_button"),
+                contentAlignment = Alignment.Center
             ) {
                 Text(
-                    text = "🎵",
-                    fontSize = 12.sp,
-                    fontWeight = FontWeight.Bold
+                    text = "⭐ $discoveredCount",
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = Color(0xFF8B6B00)
                 )
             }
 
-            // Discreet Parent Clasp Lock
+            // Instruments Button
+            Box(
+                modifier = Modifier
+                    .size(32.dp)
+                    .clip(CircleShape)
+                    .background(Color(0xFFFFFDF8))
+                    .border(1.dp, Color(0xFFC4A482), CircleShape)
+                    .clickable { onMusicPlaypadClicked() }
+                    .testTag("instruments_header_button"),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "🪘", fontSize = 14.sp)
+            }
+
+            // Discreet Parent Clasp Gate
             EmbersGateButton(
                 onGateUnlocked = onParentGateUnlocked
             )
@@ -373,12 +466,11 @@ private fun StorybookHeader(
 }
 
 /**
- * Full-Screen Illustrated Storybook Spread Page with:
- * - 2.5D Real-time hand-painted lighting
- * - "Soma Nange" Narrative reading bar
- * - Interactive objects with organic breathing, tilt and sound effects
- * - Tap ripple and sparkle particle animations
- * - Interactive Kato the Otter companion
+ * Adaptive Illustrated Storybook Spread Canvas with:
+ * - Dynamic BoxWithConstraints coordinate distribution.
+ * - Embossed picture-book vignette cards.
+ * - Tap ripple audio wave animation.
+ * - Grounded margin Kato mascot.
  */
 @Composable
 private fun StorybookSpreadView(
@@ -387,59 +479,20 @@ private fun StorybookSpreadView(
     audioManager: AuthenticAudioManager,
     onObjectTapped: (StorybookObject, RenderableLanguageContent) -> Unit
 ) {
-    val infiniteTransition = rememberInfiniteTransition(label = "Storybook25DObjectBreathing")
+    BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+        val canvasWidth = maxWidth
+        val canvasHeight = maxHeight
 
-    // Slow, soothing breathing scale (1.0f -> 1.03f over 3 seconds)
-    val breathingPhase by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 6.28318f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(3000),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "BreathingCycle"
-    )
-
-    // Animated tap ripple wave state
-    var tapRipplePos by remember { mutableStateOf<Offset?>(null) }
-    val rippleAnim = remember { Animatable(0f) }
-    val coroutineScope = rememberCoroutineScope()
-
-    Box(modifier = Modifier.fillMaxSize()) {
-        // 1. Hand-Painted Illustrated Scene Backdrop with 2.5D Real-Time Lighting
+        // 1. Hand-Painted Illustrated Scene Backdrop (Static & Crisp)
         SanctuaryCanvas(
             themeStyle = spread.themeStyle,
             modifier = Modifier.fillMaxSize()
         )
 
-        // 2. Animated Tap Ripple Wave on Canvas
-        tapRipplePos?.let { pos ->
-            Canvas(modifier = Modifier.fillMaxSize()) {
-                val radius = rippleAnim.value * 90.dp.toPx()
-                val alpha = (1f - rippleAnim.value).coerceIn(0f, 1f)
-                drawCircle(
-                    color = Color(0xFFFFD54F).copy(alpha = alpha * 0.7f),
-                    radius = radius,
-                    center = pos,
-                    style = Stroke(width = 3.dp.toPx())
-                )
-                drawCircle(
-                    color = Color(0xFFFFF9C4).copy(alpha = alpha * 0.4f),
-                    radius = radius * 0.55f,
-                    center = pos,
-                    style = Stroke(width = 2.dp.toPx())
-                )
-            }
-        }
+        // 2. Adaptively Positioned Storybook Illustrated Objects
+        val usableWidth = canvasWidth - 110.dp
+        val usableHeight = canvasHeight - 110.dp
 
-        // 3. Narrative Story Reading Bar ("Soma Nange" / Read With Me)
-        StorybookNarrativeBar(
-            spread = spread,
-            audioManager = audioManager,
-            modifier = Modifier.align(Alignment.TopCenter)
-        )
-
-        // 4. Interactive 2.5D Objects positioned with depth tilt & dynamic shadow
         spread.interactiveObjects.forEachIndexed { index, obj ->
             val rawContent = remember(obj) {
                 LanguageContent(
@@ -461,71 +514,55 @@ private fun StorybookSpreadView(
                 )
             }
 
-            val objectPhase = breathingPhase + (index * 0.9f)
-            val idleSwayY = sin(objectPhase) * 3f
-            val idleTiltX = cos(objectPhase) * 2f
-            val idleTiltY = sin(objectPhase) * 2.5f
-
             val interactionSource = remember { MutableInteractionSource() }
             val isPressed by interactionSource.collectIsPressedAsState()
 
+            val xPos = (usableWidth * obj.xPercent.coerceIn(0.04f, 0.94f)) + 12.dp
+            val yPos = (usableHeight * obj.yPercent.coerceIn(0.04f, 0.94f)) + 8.dp
+
             Box(
-                modifier = Modifier.fillMaxSize()
+                modifier = Modifier
+                    .offset(x = xPos, y = yPos)
+                    .graphicsLayer {
+                        scaleX = if (isPressed) 0.95f else 1.0f
+                        scaleY = if (isPressed) 0.95f else 1.0f
+                    }
+                    .shadow(
+                        elevation = if (isPressed) 2.dp else 5.dp,
+                        shape = RoundedCornerShape(16.dp),
+                        ambientColor = Color(0x333E2723),
+                        spotColor = Color(0x553E2723)
+                    )
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color(0xFFFFFDF7))
+                    .border(
+                        1.5.dp,
+                        Brush.verticalGradient(
+                            listOf(Color(0xFFD4AF37), Color(0xFFC4A482))
+                        ),
+                        RoundedCornerShape(16.dp)
+                    )
+                    .clickable(
+                        interactionSource = interactionSource,
+                        indication = null
+                    ) {
+                        audioManager.playObjectTapSoundAndSpeech(
+                            objectEmoji = obj.illustrationEmoji,
+                            lukenyeWord = renderable.primaryText,
+                            englishWord = obj.labelEnglish,
+                            pronunciation = obj.pronunciation,
+                            noteSeed = index
+                        )
+
+                        onObjectTapped(obj, renderable)
+                    }
+                    .padding(horizontal = 10.dp, vertical = 7.dp)
+                    .testTag("storybook_object_${obj.id}")
             ) {
-                Column(
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    modifier = Modifier
-                        .align(Alignment.TopStart)
-                        .offset(
-                            x = (obj.xPercent * 290).dp,
-                            y = (obj.yPercent * 390).dp + idleSwayY.dp + 32.dp
-                        )
-                        .graphicsLayer {
-                            // 2.5D Dynamic Tilt & Press feedback
-                            rotationX = if (isPressed) 0f else idleTiltX
-                            rotationY = if (isPressed) 0f else idleTiltY
-                            scaleX = if (isPressed) 0.96f else 1.0f + (sin(objectPhase) * 0.02f)
-                            scaleY = if (isPressed) 0.96f else 1.0f + (sin(objectPhase) * 0.02f)
-                            cameraDistance = 16f * 2.5f
-                        }
-                        .shadow(
-                            elevation = if (isPressed) 2.dp else 6.dp,
-                            shape = RoundedCornerShape(18.dp),
-                            ambientColor = Color(0x443E2723),
-                            spotColor = Color(0x663E2723)
-                        )
-                        .clip(RoundedCornerShape(18.dp))
-                        .background(Color(0xFFFFFDF5).copy(alpha = 0.96f))
-                        .border(2.dp, Color(0xFF8D6E63), RoundedCornerShape(18.dp))
-                        .clickable(
-                            interactionSource = interactionSource,
-                            indication = null
-                        ) {
-                            // Trigger sound effect and spoken audio
-                            audioManager.playObjectTapSoundAndSpeech(
-                                objectEmoji = obj.illustrationEmoji,
-                                lukenyeWord = renderable.primaryText,
-                                englishWord = obj.labelEnglish,
-                                pronunciation = obj.pronunciation,
-                                noteSeed = index
-                            )
-
-                            // Trigger expanding ripple wave
-                            coroutineScope.launch {
-                                tapRipplePos = Offset(obj.xPercent * 600f + 100f, obj.yPercent * 800f + 150f)
-                                rippleAnim.snapTo(0f)
-                                rippleAnim.animateTo(1f, tween(450, easing = LinearEasing))
-                                tapRipplePos = null
-                            }
-
-                            onObjectTapped(obj, renderable)
-                        }
-                        .padding(horizontal = 12.dp, vertical = 9.dp)
-                        .testTag("storybook_object_${obj.id}")
-                ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = obj.illustrationEmoji,
-                        fontSize = 32.sp,
+                        fontSize = 30.sp,
                         textAlign = TextAlign.Center
                     )
                     Spacer(modifier = Modifier.height(2.dp))
@@ -533,12 +570,12 @@ private fun StorybookSpreadView(
                         text = renderable.primaryText,
                         fontSize = 12.sp,
                         fontWeight = FontWeight.Bold,
-                        color = Color(0xFF3E2723),
+                        color = Color(0xFF2C1810),
                         textAlign = TextAlign.Center
                     )
                     Text(
                         text = obj.labelEnglish,
-                        fontSize = 10.sp,
+                        fontSize = 9.sp,
                         fontWeight = FontWeight.Medium,
                         color = Color(0xFF6D4C41),
                         textAlign = TextAlign.Center
@@ -547,9 +584,15 @@ private fun StorybookSpreadView(
             }
         }
 
-        // 5. Interactive Kato the Otter Companion Mascot in corner
+        // 4. Interactive Kato the Otter Mascot anchored cleanly in the margin
+        val katoPagePrompt = remember(spread) {
+            if (spread.katoPromptLukenye.isNotEmpty()) {
+                spread.katoPromptLukenye to spread.katoPromptEnglish
+            } else null
+        }
         KatoCompanionOverlay(
             audioManager = audioManager,
+            pagePrompt = katoPagePrompt,
             modifier = Modifier
                 .align(Alignment.BottomEnd)
                 .padding(end = 12.dp, bottom = 12.dp)
@@ -558,69 +601,7 @@ private fun StorybookSpreadView(
 }
 
 /**
- * Storybook Footer with Page Controls & Spread Indicator.
- */
-@Composable
-private fun StorybookFooter(
-    currentPage: Int,
-    totalPages: Int,
-    onPrevClicked: () -> Unit,
-    onNextClicked: () -> Unit
-) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(Color(0xFFEFE8D8))
-            .padding(horizontal = 14.dp, vertical = 7.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.SpaceBetween
-    ) {
-        // Previous Page Button
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(if (currentPage > 0) Color(0xFFD2B48C) else Color(0xFFE0D8C8))
-                .clickable(enabled = currentPage > 0) { onPrevClicked() }
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-                .testTag("prev_page_button")
-        ) {
-            Text(
-                text = "◄ Previous",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (currentPage > 0) Color(0xFF3E2723) else Color(0xFF9E9E9E)
-            )
-        }
-
-        // Page Indicator
-        Text(
-            text = "📖 Spread ${currentPage + 1} of $totalPages",
-            fontSize = 12.sp,
-            fontWeight = FontWeight.Bold,
-            color = Color(0xFF5D4037)
-        )
-
-        // Next Page Button
-        Box(
-            modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(if (currentPage < totalPages - 1) Color(0xFFD2B48C) else Color(0xFFE0D8C8))
-                .clickable(enabled = currentPage < totalPages - 1) { onNextClicked() }
-                .padding(horizontal = 14.dp, vertical = 8.dp)
-                .testTag("next_page_button")
-        ) {
-            Text(
-                text = "Next ►",
-                fontSize = 12.sp,
-                fontWeight = FontWeight.Bold,
-                color = if (currentPage < totalPages - 1) Color(0xFF3E2723) else Color(0xFF9E9E9E)
-            )
-        }
-    }
-}
-
-/**
- * Storybook Tactile Reading Card for Early Readers when an Object is tapped.
+ * Storybook Tactile Reading Card Modal for Selected Vocabulary Object.
  */
 @Composable
 private fun StorybookReadingCard(
@@ -633,36 +614,36 @@ private fun StorybookReadingCard(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .shadow(elevation = 12.dp, shape = RoundedCornerShape(22.dp))
+            .shadow(elevation = 14.dp, shape = RoundedCornerShape(22.dp))
             .testTag("storybook_reading_card"),
         shape = RoundedCornerShape(22.dp),
-        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF5)),
-        border = androidx.compose.foundation.BorderStroke(2.5.dp, Color(0xFF8D6E63))
+        colors = CardDefaults.cardColors(containerColor = Color(0xFFFFFDF8)),
+        border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFC4A482))
     ) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 13.dp),
+                .padding(horizontal = 16.dp, vertical = 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.SpaceBetween
         ) {
             Text(
                 text = storybookObject.illustrationEmoji,
-                fontSize = 38.sp,
+                fontSize = 40.sp,
                 modifier = Modifier.padding(end = 12.dp)
             )
 
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = renderable.primaryText,
-                    fontSize = 17.sp,
+                    fontSize = 18.sp,
                     fontWeight = FontWeight.Bold,
-                    color = Color(0xFF3E2723)
+                    color = Color(0xFF2C1810)
                 )
                 Text(
-                    text = "Pronunciation: \"${storybookObject.pronunciation}\"",
+                    text = "Pronounce: \"${storybookObject.pronunciation}\"",
                     fontSize = 12.sp,
-                    fontWeight = FontWeight.Medium,
+                    fontWeight = FontWeight.SemiBold,
                     color = Color(0xFF8D6E63)
                 )
                 Spacer(modifier = Modifier.height(2.dp))
@@ -670,17 +651,18 @@ private fun StorybookReadingCard(
                     text = "English: ${storybookObject.labelEnglish}",
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Normal,
-                    color = Color(0xFF4E342E)
+                    color = Color(0xFF5D4037)
                 )
             }
 
             Row(verticalAlignment = Alignment.CenterVertically) {
-                // Replay Audio Button with Kalimba & Speech
+                // Replay Audio Button
                 Box(
                     modifier = Modifier
-                        .size(44.dp)
+                        .size(46.dp)
                         .clip(CircleShape)
                         .background(Color(0xFFEFE8D8))
+                        .border(1.5.dp, Color(0xFFC4A482), CircleShape)
                         .clickable {
                             audioManager.playObjectTapSoundAndSpeech(
                                 objectEmoji = storybookObject.illustrationEmoji,
@@ -688,8 +670,7 @@ private fun StorybookReadingCard(
                                 englishWord = storybookObject.labelEnglish,
                                 pronunciation = storybookObject.pronunciation
                             )
-                        }
-                        .padding(8.dp),
+                        },
                     contentAlignment = Alignment.Center
                 ) {
                     Text(text = "🔊", fontSize = 18.sp)
@@ -702,11 +683,16 @@ private fun StorybookReadingCard(
                     modifier = Modifier
                         .size(34.dp)
                         .clip(CircleShape)
-                        .background(Color(0xFFD7CCC8))
+                        .background(Color(0xFFE0D7C6))
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center
                 ) {
-                    Text(text = "✕", fontSize = 14.sp, color = Color(0xFF3E2723), fontWeight = FontWeight.Bold)
+                    Text(
+                        text = "✕",
+                        fontSize = 14.sp,
+                        color = Color(0xFF3E2723),
+                        fontWeight = FontWeight.Bold
+                    )
                 }
             }
         }
@@ -714,7 +700,7 @@ private fun StorybookReadingCard(
 }
 
 /**
- * Calm Book Shelf / Bookmark Selector Modal for picking any of the 18 Launch Books.
+ * Redesigned Visual Book Shelf Library Modal with Categorized Shelves.
  */
 @Composable
 private fun BookSelectorModal(
@@ -723,77 +709,171 @@ private fun BookSelectorModal(
     onBookSelected: (Storybook) -> Unit,
     onDismiss: () -> Unit
 ) {
+    var selectedCategoryIndex by remember { mutableIntStateOf(0) }
+    val categories = listOf("All (18)", "🎣 Fishing", "🏡 Home", "🌿 Nature", "👑 Wisdom")
+
+    val filteredBooks = remember(selectedCategoryIndex, books) {
+        when (selectedCategoryIndex) {
+            1 -> books.filter { b ->
+                val style = b.spreads.firstOrNull()?.themeStyle
+                style == StorybookThemeStyle.FISHERMAN_SONG || style == StorybookThemeStyle.RIVERBANK_DAWN
+            }
+            2 -> books.filter { b ->
+                b.spreads.firstOrNull()?.themeStyle == StorybookThemeStyle.VILLAGE_HEARTH
+            }
+            3 -> books.filter { b ->
+                b.spreads.firstOrNull()?.themeStyle == StorybookThemeStyle.WETLAND_MARSH
+            }
+            4 -> books.takeLast(4)
+            else -> books
+        }
+    }
+
     Dialog(onDismissRequest = onDismiss) {
         Card(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(6.dp),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = Color(0xFFFAF8F5))
+                .padding(4.dp),
+            shape = RoundedCornerShape(26.dp),
+            colors = CardDefaults.cardColors(containerColor = Color(0xFFFAF7F0)),
+            border = androidx.compose.foundation.BorderStroke(2.dp, Color(0xFFC4A482))
         ) {
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp)
+                    .padding(14.dp)
             ) {
+                // Header
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Text(
-                        text = "📚 18 Picture Books (36 Spreads)",
-                        fontSize = 16.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = Color(0xFF3E2723)
-                    )
-                    IconButton(onClick = onDismiss, modifier = Modifier.size(28.dp)) {
-                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color.Gray)
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(text = "📚", fontSize = 22.sp, modifier = Modifier.padding(end = 6.dp))
+                        Column {
+                            Text(
+                                text = "Akatabo k'Engero (Library)",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color(0xFF2C1810)
+                            )
+                            Text(
+                                text = "18 Picture Books • 36 Spreads",
+                                fontSize = 11.sp,
+                                color = Color(0xFF8D6E63)
+                            )
+                        }
+                    }
+                    IconButton(onClick = onDismiss, modifier = Modifier.size(30.dp)) {
+                        Icon(imageVector = Icons.Default.Close, contentDescription = "Close", tint = Color(0xFF5D4037))
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Category Filter Pills
+                ScrollableTabRow(
+                    selectedTabIndex = selectedCategoryIndex,
+                    edgePadding = 0.dp,
+                    containerColor = Color.Transparent,
+                    divider = {},
+                    indicator = {}
+                ) {
+                    categories.forEachIndexed { idx, title ->
+                        val isSelected = selectedCategoryIndex == idx
+                        Tab(
+                            selected = isSelected,
+                            onClick = { selectedCategoryIndex = idx },
+                            text = {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(12.dp))
+                                        .background(if (isSelected) Color(0xFFD2B48C) else Color(0xFFEFE8D8))
+                                        .border(
+                                            1.dp,
+                                            if (isSelected) Color(0xFF8D6E63) else Color(0xFFDDD2BC),
+                                            RoundedCornerShape(12.dp)
+                                        )
+                                        .padding(horizontal = 10.dp, vertical = 5.dp)
+                                ) {
+                                    Text(
+                                        text = title,
+                                        fontSize = 11.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        color = Color(0xFF2C1810)
+                                    )
+                                }
+                            }
+                        )
                     }
                 }
 
                 Spacer(modifier = Modifier.height(10.dp))
 
+                // Book Shelf Grid
                 LazyVerticalGrid(
                     columns = GridCells.Fixed(2),
-                    verticalArrangement = Arrangement.spacedBy(8.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.height(380.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                    modifier = Modifier.height(390.dp)
                 ) {
-                    items(books) { book ->
+                    items(filteredBooks) { book ->
                         val isCurrent = book.spreads.any { it.pageIndex == currentPageIndex }
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(14.dp))
-                                .background(if (isCurrent) Color(0xFFD2B48C) else Color(0xFFEFE8D8))
+                                .clip(RoundedCornerShape(16.dp))
+                                .background(if (isCurrent) Color(0xFFFFF2D6) else Color(0xFFFFFDF8))
                                 .border(
-                                    1.dp,
-                                    if (isCurrent) Color(0xFF8D6E63) else Color(0xFFD7CCC8),
-                                    RoundedCornerShape(14.dp)
+                                    width = if (isCurrent) 2.dp else 1.dp,
+                                    color = if (isCurrent) Color(0xFFB8860B) else Color(0xFFDDD2BC),
+                                    shape = RoundedCornerShape(16.dp)
                                 )
                                 .clickable { onBookSelected(book) }
                                 .padding(10.dp)
                         ) {
                             Column {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Text(text = book.iconEmoji, fontSize = 22.sp)
-                                    Spacer(modifier = Modifier.width(6.dp))
-                                    Text(
-                                        text = book.titleLukenye,
-                                        fontSize = 13.sp,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color(0xFF3E2723)
-                                    )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Text(text = book.iconEmoji, fontSize = 26.sp)
+                                    if (isCurrent) {
+                                        Box(
+                                            modifier = Modifier
+                                                .clip(RoundedCornerShape(8.dp))
+                                                .background(Color(0xFFB8860B))
+                                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                                        ) {
+                                            Text(
+                                                text = "READING",
+                                                fontSize = 8.sp,
+                                                fontWeight = FontWeight.ExtraBold,
+                                                color = Color.White
+                                            )
+                                        }
+                                    }
                                 }
-                                Spacer(modifier = Modifier.height(2.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = book.titleLukenye,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color(0xFF2C1810),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
                                 Text(
                                     text = book.titleEnglish,
                                     fontSize = 11.sp,
-                                    color = Color(0xFF6D4C41)
+                                    color = Color(0xFF6D4C41),
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
                                 )
-                                Spacer(modifier = Modifier.height(2.dp))
+                                Spacer(modifier = Modifier.height(4.dp))
                                 Text(
-                                    text = "${book.spreads.size} Spreads",
+                                    text = "📖 ${book.spreads.size} Spreads",
                                     fontSize = 10.sp,
                                     color = Color(0xFF8D6E63),
                                     fontWeight = FontWeight.SemiBold

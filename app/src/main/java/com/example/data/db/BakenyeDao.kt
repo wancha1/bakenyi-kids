@@ -116,8 +116,17 @@ interface BakenyeDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun saveVocabularyItems(items: List<VocabularyEntity>)
 
+    @Query("SELECT * FROM vocabulary_items")
+    suspend fun getAllVocabularyOnce(): List<VocabularyEntity>
+
     @Query("SELECT * FROM child_discoveries WHERE childProfileId = :childProfileId AND locationKey = :locationKey")
     fun getChildDiscoveries(childProfileId: String, locationKey: String): Flow<List<ChildDiscoveryEntity>>
+
+    @Query("SELECT * FROM child_discoveries WHERE childProfileId = :childProfileId AND locationKey = :locationKey")
+    suspend fun getChildDiscoveriesOnce(childProfileId: String, locationKey: String): List<ChildDiscoveryEntity>
+
+    @Query("SELECT * FROM child_discoveries WHERE childProfileId = :childProfileId AND locationKey = :locationKey AND itemKey = :itemKey LIMIT 1")
+    suspend fun getDiscoveryOnce(childProfileId: String, locationKey: String, itemKey: String): ChildDiscoveryEntity?
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun recordDiscovery(discovery: ChildDiscoveryEntity)

@@ -10,6 +10,10 @@ import com.example.data.db.MIGRATION_1_2
 import com.example.data.db.MIGRATION_2_3
 import com.example.data.db.MIGRATION_3_4
 import com.example.data.db.MIGRATION_4_5
+import com.example.data.db.MIGRATION_5_6
+import com.example.data.db.MIGRATION_6_7
+import com.example.data.db.MIGRATION_7_8
+import com.example.data.db.MIGRATION_8_9
 import com.example.data.model.VocabularyEntity
 import com.example.data.repository.BakenyeRepository
 import com.example.ui.BakenyeViewModel
@@ -39,7 +43,16 @@ class BakenyeEngineVerificationTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9
+            )
             .allowMainThreadQueries()
             .build()
         repository = BakenyeRepository(db)
@@ -52,9 +65,10 @@ class BakenyeEngineVerificationTest {
 
     @Test
     fun test1_FreshInstallSchemaValidation() {
-        // Confirm AppDatabase v3 initializes and all tables exist
+        // Confirm AppDatabase v8 initializes and all tables exist with lukenyeTerm
         val cursorVocab = db.openHelper.readableDatabase.query("SELECT * FROM vocabulary_items")
         assertNotNull(cursorVocab)
+        assertTrue("lukenyeTerm column must exist in vocabulary_items table", cursorVocab.getColumnIndex("lukenyeTerm") >= 0)
         cursorVocab.close()
 
         val cursorDisc = db.openHelper.readableDatabase.query("SELECT * FROM child_discoveries")
@@ -85,6 +99,7 @@ class BakenyeEngineVerificationTest {
 
         val fishingVocabs = repository.getVocabularyForLocation("FISHING_AREA").first()
         assertEquals("Fishing area should have 5 seeded vocabulary items", 5, fishingVocabs.size)
+        assertEquals("Ensomba", fishingVocabs[0].lukenyeTerm)
 
         // 2. Call seed a second time to test idempotency
         repository.seedInitialDataIfEmpty()

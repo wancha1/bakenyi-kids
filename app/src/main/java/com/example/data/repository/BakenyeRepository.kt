@@ -19,6 +19,7 @@ import com.example.data.model.SyncOutboxEntity
 import com.example.data.model.UserProfile
 import com.example.data.model.VocabularyEntity
 import com.example.data.model.World
+import com.example.ui.sanctuary.getAllStorybookSpreads
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.combine
@@ -139,14 +140,17 @@ class BakenyeRepository(
         }
     }
 
-    suspend fun recordDiscovery(childProfileId: String, locationKey: String, speciesKey: String) {
+    suspend fun recordDiscovery(childProfileId: String, locationKey: String, speciesKey: String, isCompleted: Boolean = false) {
         val now = System.currentTimeMillis()
+        val existing = dao.getDiscoveryOnce(childProfileId, locationKey, speciesKey)
+        val completedState = isCompleted || (existing?.isCompleted == true)
         val discovery = ChildDiscoveryEntity(
             childProfileId = childProfileId,
             locationKey = locationKey,
             itemKey = speciesKey,
-            discoveredAtTimestamp = now,
-            updatedAtTimestamp = now
+            discoveredAtTimestamp = existing?.discoveredAtTimestamp ?: now,
+            updatedAtTimestamp = now,
+            isCompleted = completedState
         )
         val payload = OutboxPayloadSerializer.serializeDiscovery(discovery)
         val entityId = "$locationKey:$speciesKey"
@@ -154,7 +158,7 @@ class BakenyeRepository(
             childProfileId = childProfileId,
             entityType = "CHILD_DISCOVERY",
             entityId = entityId,
-            operation = "INSERT",
+            operation = if (existing != null) "UPDATE" else "INSERT",
             payloadJson = payload,
             timestamp = now
         ) {
@@ -162,11 +166,73 @@ class BakenyeRepository(
         }
     }
 
-    suspend fun recordDiscovery(locationKey: String, speciesKey: String) {
+    suspend fun recordDiscovery(locationKey: String, speciesKey: String, isCompleted: Boolean = false) {
         val activeProfile = dao.getFirstUserProfile()
         if (activeProfile != null) {
-            recordDiscovery(activeProfile.id, locationKey, speciesKey)
+            recordDiscovery(activeProfile.id, locationKey, speciesKey, isCompleted)
         }
+    }
+
+    suspend fun completeDiscoveryChallenge(
+        childProfileId: String,
+        locationKey: String,
+        speciesKey: String,
+        starReward: Int = 2,
+        coinReward: Int = 15
+    ): Boolean {
+        val existing = dao.getDiscoveryOnce(childProfileId, locationKey, speciesKey)
+        if (existing?.isCompleted == true) {
+            // Already completed — prevent duplicate rewards
+            return false
+        }
+
+        // Record as completed
+        recordDiscovery(childProfileId, locationKey, speciesKey, isCompleted = true)
+
+        // Award stars and coins to child's profile
+        val profile = dao.getUserProfileByIdOnce(childProfileId)
+        if (profile != null) {
+            val updated = profile.copy(
+                stars = profile.stars + starReward,
+                coins = profile.coins + coinReward,
+                updatedAtTimestamp = System.currentTimeMillis()
+            )
+            saveUserProfile(updated)
+        }
+
+        // Update overall location progress
+        val allDiscoveries = dao.getChildDiscoveriesOnce(childProfileId, locationKey)
+        val completedCount = allDiscoveries.count { it.isCompleted }
+        updateLocationProgress(
+            childProfileId = childProfileId,
+            locationId = locationKey,
+            wordsMastered = completedCount,
+            stars = completedCount * starReward,
+            isCompleted = completedCount >= 5
+        )
+        return true
+    }
+
+    suspend fun completeDiscoveryChallenge(
+        locationKey: String,
+        speciesKey: String,
+        starReward: Int = 2,
+        coinReward: Int = 15
+    ): Boolean {
+        val activeProfile = dao.getFirstUserProfile() ?: return false
+        return completeDiscoveryChallenge(activeProfile.id, locationKey, speciesKey, starReward, coinReward)
+    }
+
+    fun getDiscoveriesForLocation(childProfileId: String, locationKey: String): Flow<List<ChildDiscoveryEntity>> {
+        return dao.getChildDiscoveries(childProfileId, locationKey)
+    }
+
+    suspend fun getDiscoveryOnce(childProfileId: String, locationKey: String, speciesKey: String): ChildDiscoveryEntity? {
+        return dao.getDiscoveryOnce(childProfileId, locationKey, speciesKey)
+    }
+
+    suspend fun getAllVocabularyOnce(): List<VocabularyEntity> {
+        return dao.getAllVocabularyOnce()
     }
 
     suspend fun updateLocationProgress(
@@ -455,7 +521,40 @@ class BakenyeRepository(
                 VocabularyEntity("V_ERYATO", "FISHING_AREA", "Eryato", "Traditional Wooden Canoe", "Eh-ryah-toh", "audio_eryato", "Handcrafted canoe hollowed from sacred MVule trees."),
                 VocabularyEntity("V_EKITIMBA", "FISHING_AREA", "Ekitimba", "Woven Fishing Net", "Eh-kee-teem-bah", "audio_ekitimba", "Hand-knotted reed mesh passed down through fisherman elders.")
             )
-            dao.saveVocabularyItems(fishingVocabulary)
+            val allSpreads = getAllStorybookSpreads()
+            val allPageVocabulary = allSpreads.flatMap { spread ->
+                spread.interactiveObjects.map { obj ->
+                    VocabularyEntity(
+                        id = "V_${obj.id}",
+                        locationId = spread.bookId.uppercase(),
+                        lukenyeTerm = obj.labelLukenye,
+                        englishMeaning = obj.labelEnglish,
+                        phonetic = obj.pronunciation,
+                        audioPath = obj.audioAssetPath,
+                        culturalFact = spread.conceptDescription
+                    )
+                }
+            }
+            dao.saveVocabularyItems(fishingVocabulary + allPageVocabulary)
+        }
+
+        if (dao.getPhraseCount() == 0) {
+            val allSpreads = getAllStorybookSpreads()
+            val allPagePhrases = allSpreads.flatMapIndexed { sIndex, spread ->
+                spread.phrases.mapIndexed { pIndex, phrase ->
+                    Phrase(
+                        id = "PH_${spread.bookId}_${spread.pageNumberInBook}_$pIndex",
+                        worldId = (sIndex % 11) + 1,
+                        bakenyeText = phrase.lukenye,
+                        englishText = phrase.english,
+                        pronunciation = phrase.pronunciation,
+                        iconEmoji = phrase.speakerEmoji,
+                        category = spread.bookTitleEnglish,
+                        audioNote = spread.titleLukenye
+                    )
+                }
+            }
+            dao.savePhrases(allPagePhrases)
         }
 
         if (dao.getLocationProgressCount(profile.id, "FISHING_AREA") == 0) {

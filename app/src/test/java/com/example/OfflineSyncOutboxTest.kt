@@ -9,6 +9,10 @@ import com.example.data.db.MIGRATION_1_2
 import com.example.data.db.MIGRATION_2_3
 import com.example.data.db.MIGRATION_3_4
 import com.example.data.db.MIGRATION_4_5
+import com.example.data.db.MIGRATION_5_6
+import com.example.data.db.MIGRATION_6_7
+import com.example.data.db.MIGRATION_7_8
+import com.example.data.db.MIGRATION_8_9
 import com.example.data.model.UserProfile
 import com.example.data.repository.BakenyeRepository
 import kotlinx.coroutines.runBlocking
@@ -38,7 +42,16 @@ class OfflineSyncOutboxTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext<Context>()
         db = Room.inMemoryDatabaseBuilder(context, AppDatabase::class.java)
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9
+            )
             .allowMainThreadQueries()
             .build()
         repository = BakenyeRepository(db)
@@ -212,7 +225,16 @@ class OfflineSyncOutboxTest {
         context.deleteDatabase("restart_outbox_test.db")
 
         val persistentDb1 = Room.databaseBuilder(context, AppDatabase::class.java, "restart_outbox_test.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9
+            )
             .allowMainThreadQueries()
             .build()
 
@@ -228,7 +250,16 @@ class OfflineSyncOutboxTest {
 
         // Re-open persistent DB
         val persistentDb2 = Room.databaseBuilder(context, AppDatabase::class.java, "restart_outbox_test.db")
-            .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5)
+            .addMigrations(
+                MIGRATION_1_2,
+                MIGRATION_2_3,
+                MIGRATION_3_4,
+                MIGRATION_4_5,
+                MIGRATION_5_6,
+                MIGRATION_6_7,
+                MIGRATION_7_8,
+                MIGRATION_8_9
+            )
             .allowMainThreadQueries()
             .build()
 

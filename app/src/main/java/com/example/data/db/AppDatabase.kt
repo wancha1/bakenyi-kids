@@ -347,6 +347,43 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
     }
 }
 
+val MIGRATION_7_8 = object : Migration(7, 8) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        // Recreate vocabulary_items with lukenyeTerm column replacing lugandaTerm, preserving all data
+        db.execSQL(
+            """
+            CREATE TABLE IF NOT EXISTS `vocabulary_items_new` (
+                `id` TEXT NOT NULL,
+                `locationId` TEXT NOT NULL,
+                `lukenyeTerm` TEXT NOT NULL,
+                `englishMeaning` TEXT NOT NULL,
+                `phonetic` TEXT NOT NULL,
+                `audioPath` TEXT NOT NULL,
+                `culturalFact` TEXT NOT NULL,
+                PRIMARY KEY(`id`)
+            )
+            """.trimIndent()
+        )
+
+        db.execSQL(
+            """
+            INSERT INTO `vocabulary_items_new` (`id`, `locationId`, `lukenyeTerm`, `englishMeaning`, `phonetic`, `audioPath`, `culturalFact`)
+            SELECT `id`, `locationId`, `lugandaTerm`, `englishMeaning`, `phonetic`, `audioPath`, `culturalFact`
+            FROM `vocabulary_items`
+            """.trimIndent()
+        )
+
+        db.execSQL("DROP TABLE `vocabulary_items`")
+        db.execSQL("ALTER TABLE `vocabulary_items_new` RENAME TO `vocabulary_items`")
+    }
+}
+
+val MIGRATION_8_9 = object : Migration(8, 9) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE `child_discoveries` ADD COLUMN `isCompleted` INTEGER NOT NULL DEFAULT 0")
+    }
+}
+
 @Database(
     entities = [
         UserProfile::class,
@@ -363,7 +400,7 @@ val MIGRATION_6_7 = object : Migration(6, 7) {
         LanguageContentEntity::class,
         SanctuaryStateEntity::class
     ],
-    version = 7,
+    version = 9,
     exportSchema = false
 )
 abstract class AppDatabase : RoomDatabase() {
@@ -378,13 +415,22 @@ abstract class AppDatabase : RoomDatabase() {
         fun getDatabase(context: Context): AppDatabase {
             return INSTANCE ?: synchronized(this) {
                 try {
-                    Log.d("DATABASE_DEBUG", "Initializing AppDatabase version 7 with MIGRATIONS 1_2, 2_3, 3_4, 4_5, 5_6, 6_7")
+                    Log.d("DATABASE_DEBUG", "Initializing AppDatabase version 9 with MIGRATIONS 1_2 to 8_9")
                     val instance = Room.databaseBuilder(
                         context.applicationContext,
                         AppDatabase::class.java,
                         "bakenye_kids_db"
                     )
-                        .addMigrations(MIGRATION_1_2, MIGRATION_2_3, MIGRATION_3_4, MIGRATION_4_5, MIGRATION_5_6, MIGRATION_6_7)
+                        .addMigrations(
+                            MIGRATION_1_2,
+                            MIGRATION_2_3,
+                            MIGRATION_3_4,
+                            MIGRATION_4_5,
+                            MIGRATION_5_6,
+                            MIGRATION_6_7,
+                            MIGRATION_7_8,
+                            MIGRATION_8_9
+                        )
                         .build()
                     INSTANCE = instance
                     Log.d("DATABASE_DEBUG", "AppDatabase initialized successfully")

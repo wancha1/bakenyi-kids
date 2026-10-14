@@ -70,6 +70,7 @@ object OutboxPayloadSerializer {
         json.put("itemKey", discovery.itemKey)
         json.put("discoveredAtTimestamp", discovery.discoveredAtTimestamp)
         json.put("updatedAtTimestamp", discovery.updatedAtTimestamp)
+        json.put("isCompleted", discovery.isCompleted)
         return json.toString()
     }
 }

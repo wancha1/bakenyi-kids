@@ -8,6 +8,8 @@ import android.media.AudioTrack
 import android.media.MediaPlayer
 import android.media.SoundPool
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.speech.tts.TextToSpeech
 import android.speech.tts.UtteranceProgressListener
 import android.util.Log
@@ -38,6 +40,7 @@ class AuthenticAudioManager private constructor(private val context: Context) : 
     private var isTtsReady = false
 
     private val audioExecutor = Executors.newSingleThreadExecutor()
+    private val mainHandler = Handler(Looper.getMainLooper())
     private val random = Random()
 
     // Pentatonic scale frequencies in Hz for harmonious kalimba notes (C4, D4, E4, G4, A4, C5, D5, E5)
@@ -418,6 +421,74 @@ class AuthenticAudioManager private constructor(private val context: Context) : 
             tts?.stop()
         } catch (e: Exception) {
             Log.e("AUDIO_DEBUG", "Error stopping TTS", e)
+        }
+    }
+
+    /**
+     * Speaks a conversational phrase with a warm introductory kalimba chime and gentle cadence.
+     */
+    fun speakPhrase(
+        phraseLukenye: String,
+        phraseEnglish: String,
+        onComplete: () -> Unit = {}
+    ) {
+        audioExecutor.execute {
+            playKalimbaChime(2)
+            try {
+                Thread.sleep(120)
+            } catch (ignored: Exception) {}
+
+            mainHandler.post {
+                try {
+                    val textToSpeak = "$phraseLukenye. ... $phraseEnglish"
+                    val utteranceId = "phrase_${System.currentTimeMillis()}"
+
+                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {}
+                        override fun onDone(utteranceId: String?) { onComplete() }
+                        override fun onError(utteranceId: String?) { onComplete() }
+                    })
+
+                    tts?.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+                } catch (e: Exception) {
+                    Log.e("AUDIO_DEBUG", "Error in speakPhrase", e)
+                    onComplete()
+                }
+            }
+        }
+    }
+
+    /**
+     * Speaks Kato's page challenge with a playful otter chirp followed by voice audio.
+     */
+    fun playKatoPagePrompt(
+        lukenyePrompt: String,
+        englishPrompt: String,
+        onComplete: () -> Unit = {}
+    ) {
+        audioExecutor.execute {
+            playKatoCompanionChirp()
+            try {
+                Thread.sleep(180)
+            } catch (ignored: Exception) {}
+
+            mainHandler.post {
+                try {
+                    val textToSpeak = "$lukenyePrompt! ... $englishPrompt"
+                    val utteranceId = "kato_prompt_${System.currentTimeMillis()}"
+
+                    tts?.setOnUtteranceProgressListener(object : UtteranceProgressListener() {
+                        override fun onStart(utteranceId: String?) {}
+                        override fun onDone(utteranceId: String?) { onComplete() }
+                        override fun onError(utteranceId: String?) { onComplete() }
+                    })
+
+                    tts?.speak(textToSpeak, TextToSpeech.QUEUE_FLUSH, null, utteranceId)
+                } catch (e: Exception) {
+                    Log.e("AUDIO_DEBUG", "Error in playKatoPagePrompt", e)
+                    onComplete()
+                }
+            }
         }
     }
 
